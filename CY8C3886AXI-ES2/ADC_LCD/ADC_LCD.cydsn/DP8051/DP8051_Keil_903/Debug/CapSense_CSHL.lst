@@ -1,0 +1,3801 @@
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 1   
+
+
+C51 COMPILER V9.03, COMPILATION OF MODULE CAPSENSE_CSHL
+OBJECT MODULE PLACED IN .\DP8051\DP8051_Keil_903\Debug\CapSense_CSHL.obj
+COMPILER INVOKED BY: C:\Program Files (x86)\Cypress\PSoC Creator\2.0\PSoC Creator\import\keil\pk51\9.03\C51\BIN\c51.exe 
+                    -.\Generated_Source\PSoC3\CapSense_CSHL.c NOIV LARGE MODDP2 OMF2 VB(1) PR(.\DP8051\DP8051_Keil_903\Debug\CapSense_CSHL.ls
+                    -t) CD DB NOIP OT(2,SIZE) INCDIR(Generated_Source\PSoC3) OJ(.\DP8051\DP8051_Keil_903\Debug\CapSense_CSHL.obj)
+
+line level    source
+
+   1          /*******************************************************************************
+   2          * File Name: CapSense_CSHL.c
+   3          * Version 3.10
+   4          *
+   5          * Description:
+   6          *  This file provides the source code to the High Level APIs for the CapSesne
+   7          *  CSD component.
+   8          *
+   9          * Note:
+  10          *
+  11          ********************************************************************************
+  12          * Copyright 2008-2011, Cypress Semiconductor Corporation.  All rights reserved.
+  13          * You may use this file only in accordance with the license, terms, conditions,
+  14          * disclaimers, and limitations in the end user license agreement accompanying
+  15          * the software package with which this file was provided.
+  16          *******************************************************************************/
+  17          
+  18          #include "CapSense_CSHL.h"
+  19          
+  20          /* SmartSense functions */
+  21          #if (CapSense_TUNING_METHOD == CapSense_AUTO_TUNING)
+  22              extern void CapSense_CalculateThresholds(uint8 SensorNumber);
+  23          #endif /* End (CapSense_TUNING_METHOD == CapSense_AUTO_TUNING) */
+  24          
+  25          /* Median filter function prototype */
+  26          #if ( (CapSense_RAW_FILTER_MASK & CapSense_MEDIAN_FILTER) || \
+  27                (CapSense_POS_FILTERS_MASK & CapSense_MEDIAN_FILTER) )
+                  uint16 CapSense_MedianFilter(uint16 x1, uint16 x2, uint16 x3) \
+                  ;
+              #endif /* End CapSense_RAW_FILTER_MASK && CapSense_POS_FILTERS_MASK */
+  31          
+  32          /* Averaging filter function prototype */
+  33          #if ( (CapSense_RAW_FILTER_MASK & CapSense_AVERAGING_FILTER) || \
+  34                (CapSense_POS_FILTERS_MASK & CapSense_AVERAGING_FILTER) )
+                  uint16 CapSense_AveragingFilter(uint16 x1, uint16 x2, uint16 x3) \
+                  ;
+              #endif /* End CapSense_RAW_FILTER_MASK && CapSense_POS_FILTERS_MASK */
+  38          
+  39          /* IIR2Filter(1/2prev + 1/2cur) filter function prototype */
+  40          #if ( (CapSense_RAW_FILTER_MASK & CapSense_IIR2_FILTER) || \
+  41                (CapSense_POS_FILTERS_MASK & CapSense_IIR2_FILTER) )
+              uint16 CapSense_IIR2Filter(uint16 x1, uint16 x2) ;
+              #endif /* End CapSense_RAW_FILTER_MASK && CapSense_POS_FILTERS_MASK */
+  44          
+  45          /* IIR4Filter(3/4prev + 1/4cur) filter function prototype */
+  46          #if ( (CapSense_RAW_FILTER_MASK & CapSense_IIR4_FILTER) || \
+  47                (CapSense_POS_FILTERS_MASK & CapSense_IIR4_FILTER) )
+                  uint16 CapSense_IIR4Filter(uint16 x1, uint16 x2) ;
+              #endif /* End CapSense_RAW_FILTER_MASK && CapSense_POS_FILTERS_MASK */
+  50          
+  51          /* IIR8Filter(7/8prev + 1/8cur) filter function prototype - RawCounts only */
+  52          #if (CapSense_RAW_FILTER_MASK & CapSense_IIR8_FILTER)
+                  uint16 CapSense_IIR8Filter(uint16 x1, uint16 x2) ;
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 2   
+
+              #endif /* End CapSense_RAW_FILTER_MASK */
+  55          
+  56          /* IIR16Filter(15/16prev + 1/16cur) filter function prototype - RawCounts only */
+  57          #if (CapSense_RAW_FILTER_MASK & CapSense_IIR16_FILTER)
+                  uint16 CapSense_IIR16Filter(uint16 x1, uint16 x2) ;
+              #endif /* End CapSense_RAW_FILTER_MASK */
+  60          
+  61          /* JitterFilter filter function prototype */
+  62          #if ( (CapSense_RAW_FILTER_MASK & CapSense_JITTER_FILTER) || \
+  63                (CapSense_POS_FILTERS_MASK & CapSense_JITTER_FILTER) )
+                  uint16 CapSense_JitterFilter(uint16 x1, uint16 x2) ;
+              #endif /* End CapSense_RAW_FILTER_MASK && CapSense_POS_FILTERS_MASK */
+  66          
+  67          /* Storage of filters data */
+  68          #if ( (CapSense_RAW_FILTER_MASK & CapSense_MEDIAN_FILTER) || \
+  69                (CapSense_RAW_FILTER_MASK & CapSense_AVERAGING_FILTER) )
+              
+                  uint16 CapSense_rawFilterData1[CapSense_TOTAL_SENSOR_COUNT];
+                  uint16 CapSense_rawFilterData2[CapSense_TOTAL_SENSOR_COUNT];
+              
+              #elif ( (CapSense_RAW_FILTER_MASK & CapSense_IIR2_FILTER)   || \
+                      (CapSense_RAW_FILTER_MASK & CapSense_IIR4_FILTER)   || \
+                      (CapSense_RAW_FILTER_MASK & CapSense_JITTER_FILTER) || \
+                      (CapSense_RAW_FILTER_MASK & CapSense_IIR8_FILTER)   || \
+                      (CapSense_RAW_FILTER_MASK & CapSense_IIR16_FILTER) )
+                      
+                  uint16 CapSense_rawFilterData1[CapSense_TOTAL_SENSOR_COUNT];
+              
+              #else
+  83              /* No Raw filters */
+  84          #endif  /* End CapSense_RAW_FILTER_MASK */
+  85          
+  86          extern uint16 CapSense_SensorRaw[CapSense_TOTAL_SENSOR_COUNT];
+  87          extern uint8 CapSense_SensorEnableMask[(((CapSense_TOTAL_SENSOR_COUNT - 1u) / 8u) + 1u)];
+  88          extern const uint8 CYCODE CapSense_widgetNumber[];
+  89          
+  90          uint16 CapSense_SensorBaseline[CapSense_TOTAL_SENSOR_COUNT] = {0u};
+  91          uint8 CapSense_SensorBaselineLow[CapSense_TOTAL_SENSOR_COUNT] = {0u};
+  92          uint8 CapSense_SensorSignal[CapSense_TOTAL_SENSOR_COUNT] = {0u};
+  93          uint8 CapSense_SensorOnMask[(((CapSense_TOTAL_SENSOR_COUNT - 1u) / 8u) + 1u)] = {0u};
+  94          
+  95          uint8 CapSense_LowBaselineResetCnt[CapSense_TOTAL_SENSOR_COUNT];
+  96          
+  97          /* Helps while centroid calulation */
+  98          #if (CapSense_TOTAL_CENTROIDS_COUNT)
+                  static uint8 CapSense_centroid[3];
+              #endif  /* End (CapSense_TOTAL_CENTROIDS_COUNT) */
+ 101          
+ 102          uint8 CapSense_fingerThreshold[] = {
+ 103              100u, 100u, 
+ 104          };
+ 105          
+ 106          uint8 CapSense_noiseThreshold[] = {
+ 107              20u, 20u, 
+ 108          };
+ 109          
+ 110          uint8 CapSense_hysteresis[] = {
+ 111              10u, 10u, 
+ 112          };
+ 113          
+ 114          uint8 CapSense_debounce[] = {
+ 115              1u, 1u, 
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 3   
+
+ 116          };
+ 117          
+ 118          uint8 CapSense_debounceCounter[] = {
+ 119              0u, 0u, 0u, 
+ 120          };
+ 121          
+ 122          const uint8 CYCODE CapSense_rawDataIndex[] = {
+ 123              0u, /* Button0__BTN */
+ 124              1u, /* Button1__BTN */
+ 125          
+ 126          };
+ 127          
+ 128          const uint8 CYCODE CapSense_numberOfSensors[] = {
+ 129              1u, /* Button0__BTN */
+ 130              1u, /* Button1__BTN */
+ 131          
+ 132          };
+ 133          
+ 134          
+ 135          
+ 136          /*******************************************************************************
+ 137          * Function Name: CapSense_BaseInit
+ 138          ********************************************************************************
+ 139          *
+ 140          * Summary:
+ 141          *  Loads the CapSense_SensorBaseline[sensor] array element with an 
+ 142          *  initial value which is equal to raw count value. 
+ 143          *  Resets to zero CapSense_SensorBaselineLow[senesor] and 
+ 144          *  CapSense_SensorSignal[sensor] array element.
+ 145          *  Loads CapSense_debounceCounter[sensor] array element with initial 
+ 146          *  value equal CapSense_debounce[].
+ 147          *  Loads the CapSense_rawFilterData2[sensor] and 
+ 148          *  CapSense_rawFilterData2[sensor] array element with an 
+ 149          *  initial value which is equal raw count value if raw data filter is enabled.
+ 150          *
+ 151          * Parameters:
+ 152          *  sensor:  Sensor number.
+ 153          *
+ 154          * Return:
+ 155          *  None
+ 156          *
+ 157          * Global Variables:
+ 158          *  CapSense_SensorBaseline[]    - used to store baseline value.
+ 159          *  CapSense_SensorBaselineLow[] - used to store fraction byte of 
+ 160          *  baseline value.
+ 161          *  CapSense_SensorSignal[]      - used to store diffence between 
+ 162          *  current value of raw data and previous value of baseline.
+ 163          *  CapSense_debounceCounter[]   - used to store current debounce 
+ 164          *  counter of sensor. Widget which has this parameter are buttons, matrix 
+ 165          *  buttons, proximity, guard. All other widgets haven't debounce parameter
+ 166          *  and use the last element of this array with value 0 (it means no debounce).
+ 167          *  CapSense_rawFilterData1[]    - used to store previous sample of 
+ 168          *  any enabled raw data filter.
+ 169          *  CapSense_rawFilterData2[]    - used to store before previous sample
+ 170          *  of enabled raw data filter. Only required for median or average filters.
+ 171          *
+ 172          * Reentrant:
+ 173          *  No
+ 174          *
+ 175          *******************************************************************************/
+ 176          void CapSense_BaseInit(uint8 sensor)
+ 177          {
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 4   
+
+ 178   1          #if ((CapSense_TOTAL_BUTTONS_COUNT) || (CapSense_TOTAL_MATRIX_BUTTONS_COUNT) || \
+ 179   1               (CapSense_TOTAL_GENERICS_COUNT))
+ 180   1              uint8 widget = CapSense_widgetNumber[sensor];
+ 181   1          #endif /* ((CapSense_TOTAL_MATRIX_BUTTONS_COUNT) || (CapSense_TOTAL_MATRIX_BUTTONS_COUNT)) */
+ 182   1          
+ 183   1          #if (CapSense_TOTAL_MATRIX_BUTTONS_COUNT)
+                      uint8 debounceIndex;
+                  #endif  /* End (CapSense_TOTAL_MATRIX_BUTTONS_COUNT != 0u) */
+ 186   1          
+ 187   1          #if (CapSense_TOTAL_GENERICS_COUNT)
+                      /* Exclude generic widget */
+                      if(widget < CapSense_END_OF_WIDGETS_INDEX)
+                      {
+                  #endif  /* End CapSense_TOTAL_GENERICS_COUNT */
+ 192   1          
+ 193   1          /* Initialize Baseline */
+ 194   1          CapSense_SensorBaseline[sensor] = CapSense_SensorRaw[sensor];
+ 195   1          CapSense_SensorBaselineLow[sensor] = 0u;
+ 196   1          CapSense_SensorSignal[sensor] = 0u;
+ 197   1              
+ 198   1          CapSense_debounceCounter[widget] =  CapSense_debounce[widget];
+ 199   1      
+ 200   1          
+ 201   1          #if ((CapSense_RAW_FILTER_MASK & CapSense_MEDIAN_FILTER) ||\
+ 202   1               (CapSense_RAW_FILTER_MASK & CapSense_AVERAGING_FILTER))
+              
+                      CapSense_rawFilterData1[sensor] = CapSense_SensorRaw[sensor];
+                      CapSense_rawFilterData2[sensor] = CapSense_SensorRaw[sensor];
+                  
+                  #elif ((CapSense_RAW_FILTER_MASK & CapSense_IIR2_FILTER) ||\
+                         (CapSense_RAW_FILTER_MASK & CapSense_IIR4_FILTER) ||\
+                         (CapSense_RAW_FILTER_MASK & CapSense_JITTER_FILTER) ||\
+                         (CapSense_RAW_FILTER_MASK & CapSense_IIR8_FILTER) ||\
+                         (CapSense_RAW_FILTER_MASK & CapSense_IIR16_FILTER))
+                          
+                      CapSense_rawFilterData1[sensor] = CapSense_SensorRaw[sensor];
+                  
+                  #else
+ 216   1              /* No Raw filters */
+ 217   1          #endif  /* End CapSense_RAW_FILTER_MASK */
+ 218   1          
+ 219   1          #if (CapSense_TOTAL_GENERICS_COUNT)
+                      /* Exclude generic widget */
+                      }
+                  #endif  /* End CapSense_TOTAL_GENERICS_COUNT */
+ 223   1      }
+ 224          
+ 225          
+ 226          /*******************************************************************************
+ 227          * Function Name: CapSense_InitializeSensorBaseline
+ 228          ********************************************************************************
+ 229          *
+ 230          * Summary:
+ 231          *  Loads the CapSense_SensorBaseline[sensor] array element with an 
+ 232          *  initial value by scanning the selected sensor (one channel design) or pair 
+ 233          *  of sensors (two channels designs). The raw count value is copied into the 
+ 234          *  baseline array for each sensor. The raw data filters are initialized if 
+ 235          *  enabled.
+ 236          *
+ 237          * Parameters:
+ 238          *  sensor:  Sensor number.
+ 239          *
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 5   
+
+ 240          * Return:
+ 241          *  None
+ 242          *
+ 243          * Reentrant:
+ 244          *  No
+ 245          *
+ 246          *******************************************************************************/
+ 247          void CapSense_InitializeSensorBaseline(uint8 sensor)
+ 248          {
+ 249   1          /* Scan sensor */
+ 250   1          CapSense_ScanSensor(sensor);
+ 251   1          while(CapSense_IsBusy() != 0u) {;}
+ 252   1          
+ 253   1          #if (CapSense_DESIGN_TYPE == CapSense_ONE_CHANNEL_DESIGN)
+ 254   1              /* Initialize Baseline, Signal and debounce counters */       
+ 255   1              CapSense_BaseInit(sensor);
+ 256   1              
+ 257   1          #else
+                  
+                      if(sensor < CapSense_TOTAL_SENSOR_COUNT__CH0)
+                      {
+                          /* Initialize Baseline, Signal and debounce counters */ 
+                          CapSense_BaseInit(sensor);
+                      }
+                      
+                      if(sensor < CapSense_TOTAL_SENSOR_COUNT__CH1)
+                      {
+                          /* Initialize Baseline, Signal and debounce counters */
+                          CapSense_BaseInit(sensor + CapSense_TOTAL_SENSOR_COUNT__CH0);
+                      }
+                  
+                  #endif  /* End (CapSense_DESIGN_TYPE == CapSense_ONE_CHANNEL_DESIGN) */
+ 272   1      }
+ 273          
+ 274          
+ 275          /*******************************************************************************
+ 276          * Function Name: CapSense_InitializeAllBaselines
+ 277          ********************************************************************************
+ 278          *
+ 279          * Summary:
+ 280          *  Uses the CapSense_InitializeSensorBaseline function to loads the 
+ 281          *  CapSense_SensorBaseline[] array with an initial values by scanning 
+ 282          *  all sensors. The raw count values are copied into the baseline array for 
+ 283          *  all sensors. The raw data filters are initialized if enabled.
+ 284          *
+ 285          * Parameters:
+ 286          *  None
+ 287          *
+ 288          * Return:
+ 289          *  None
+ 290          *
+ 291          * Reentrant:
+ 292          *  No
+ 293          *
+ 294          *******************************************************************************/
+ 295          void CapSense_InitializeAllBaselines(void)
+ 296          {
+ 297   1          uint8 i;
+ 298   1          
+ 299   1          /* The baseline initialize by sensor of sensor pair */
+ 300   1          for(i = 0u; i < CapSense_TOTAL_SCANSLOT_COUNT; i++)
+ 301   1          {
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 6   
+
+ 302   2              CapSense_InitializeSensorBaseline(i);
+ 303   2          }
+ 304   1      }
+ 305          
+ 306          
+ 307          /*******************************************************************************
+ 308          * Function Name: CapSense_InitializeEnabledBaselines
+ 309          ********************************************************************************
+ 310          *
+ 311          * Summary:
+ 312          *  Scans all enabled widgets and the raw count values are copied into the 
+ 313          *  baseline array for all sensors enabled in scanning process. Baselines 
+ 314          *  initialize with zero values for sensors disabled from scanning process. 
+ 315          *  The raw data filters are initialized if enabled.
+ 316          *
+ 317          * Parameters:
+ 318          *  None
+ 319          *
+ 320          * Return:
+ 321          *  None
+ 322          *
+ 323          * Reentrant:
+ 324          *  No
+ 325          *
+ 326          *******************************************************************************/
+ 327          void CapSense_InitializeEnabledBaselines(void)
+ 328          {
+ 329   1          uint8 i;
+ 330   1          uint8 pos;
+ 331   1          uint8 enMask;
+ 332   1          
+ 333   1          CapSense_ScanEnabledWidgets();
+ 334   1          while(CapSense_IsBusy() != 0u){;}
+ 335   1          
+ 336   1          for(i = 0u; i < CapSense_TOTAL_SENSOR_COUNT; i++)
+ 337   1          {
+ 338   2              pos = (i >> 3u);
+ 339   2              enMask = 0x01u << (i & 0x07u);
+ 340   2              
+ 341   2              /* Clear raw data if sensor is disabled from scanning process */
+ 342   2              if((CapSense_SensorEnableMask[pos] & enMask) == 0u)
+ 343   2              {
+ 344   3                  CapSense_SensorRaw[i] = 0u;
+ 345   3              }
+ 346   2              
+ 347   2              /* Initialize baselines */
+ 348   2              CapSense_BaseInit(i);
+ 349   2          }
+ 350   1      }  
+ 351          
+ 352          
+ 353          /*******************************************************************************
+ 354          * Function Name: CapSense_UpdateSensorBaseline
+ 355          ********************************************************************************
+ 356          *
+ 357          * Summary:
+ 358          *  Updates the CapSense_SensorBaseline[sensor] array element using the 
+ 359          *  LP filter with k = 256. The signal calculates the difference of count by 
+ 360          *  subtracting the previous baseline from the current raw count value and stores
+ 361          *  it in CapSense_SensorSignal[sensor]. 
+ 362          *  If auto reset option is enabled the baseline updated regards noise threshold. 
+ 363          *  If auto reset option is disabled the baseline stops updating if signal is 
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 7   
+
+ 364          *  greater that zero and baseline loads with raw count value if signal is less 
+ 365          *  that noise threshold.
+ 366          *  Raw data filters are applied to the values if enabled before baseline 
+ 367          *  calculation.
+ 368          *
+ 369          * Parameters:
+ 370          *  sensor:  Sensor number.
+ 371          *
+ 372          * Return:
+ 373          *  None
+ 374          *
+ 375          * Global Variables:
+ 376          *  CapSense_SensorBaseline[]    - used to store baseline value.
+ 377          *  CapSense_SensorBaselineLow[] - used to store fraction byte of 
+ 378          *  baseline value.
+ 379          *  CapSense_SensorSignal[]      - used to store diffence between 
+ 380          *  current value of raw data and previous value of baseline.
+ 381          *  CapSense_rawFilterData1[]    - used to store previous sample of 
+ 382          *  any enabled raw data filter.
+ 383          *  CapSense_rawFilterData2[]    - used to store before previous sample
+ 384          *  of enabled raw data filter. Only required for median or average filters.
+ 385          *
+ 386          * Reentrant:
+ 387          *  No
+ 388          *
+ 389          *******************************************************************************/
+ 390           void CapSense_UpdateSensorBaseline(uint8 sensor)
+ 391          {
+ 392   1          uint32 calc;
+ 393   1          uint16 tempRaw;
+ 394   1          uint16 filteredRawData;
+ 395   1          uint8 widget = CapSense_widgetNumber[sensor];
+ 396   1          uint8 noiseThreshold = CapSense_noiseThreshold[widget];
+ 397   1          
+ 398   1          #if (CapSense_TOTAL_GENERICS_COUNT)
+                      /* Exclude generic widget */
+                      if(widget < CapSense_END_OF_WIDGETS_INDEX)
+                      {
+                  #endif  /* End CapSense_TOTAL_GENERICS_COUNT */
+ 403   1          
+ 404   1          filteredRawData = CapSense_SensorRaw[sensor];
+ 405   1          
+ 406   1          #if (CapSense_RAW_FILTER_MASK & CapSense_MEDIAN_FILTER)
+                      tempRaw = filteredRawData;
+                      filteredRawData = CapSense_MedianFilter(filteredRawData, CapSense_rawFilterData1[sensor], 
+                                                                      CapSense_rawFilterData2[sensor]);
+                      CapSense_rawFilterData2[sensor] = CapSense_rawFilterData1[sensor];
+                      CapSense_rawFilterData1[sensor] = tempRaw;
+                      
+                  #elif (CapSense_RAW_FILTER_MASK & CapSense_AVERAGING_FILTER)
+                      tempRaw = filteredRawData;
+                      filteredRawData = CapSense_AveragingFilter(filteredRawData, CapSense_rawFilterData1[sensor],
+                                                                         CapSense_rawFilterData2[sensor]);
+                      CapSense_rawFilterData2[sensor] = CapSense_rawFilterData1[sensor];
+                      CapSense_rawFilterData1[sensor] = tempRaw;
+                      
+                  #elif (CapSense_RAW_FILTER_MASK & CapSense_IIR2_FILTER)
+                      filteredRawData = CapSense_IIR2Filter(filteredRawData, CapSense_rawFilterData1[sensor]);
+                      CapSense_rawFilterData1[sensor] = filteredRawData;
+                      
+                  #elif (CapSense_RAW_FILTER_MASK & CapSense_IIR4_FILTER)
+                      filteredRawData = CapSense_IIR4Filter(filteredRawData, CapSense_rawFilterData1[sensor]);
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 8   
+
+                      CapSense_rawFilterData1[sensor] = filteredRawData;
+                          
+                  #elif (CapSense_RAW_FILTER_MASK & CapSense_JITTER_FILTER)
+                      filteredRawData = CapSense_JitterFilter(filteredRawData, CapSense_rawFilterData1[sensor]);
+                      CapSense_rawFilterData1[sensor] = filteredRawData;
+                      
+                  #elif (CapSense_RAW_FILTER_MASK & CapSense_IIR8_FILTER)
+                      filteredRawData = CapSense_IIR8Filter(filteredRawData, CapSense_rawFilterData1[sensor]);
+                      CapSense_rawFilterData1[sensor] = filteredRawData;
+                      
+                  #elif (CapSense_RAW_FILTER_MASK & CapSense_IIR16_FILTER)
+                      filteredRawData = CapSense_IIR16Filter(filteredRawData, CapSense_rawFilterData1[sensor]);
+                      CapSense_rawFilterData1[sensor] = filteredRawData;
+                      
+                  #else
+ 441   1              /* No Raw filters */
+ 442   1          #endif  /* End (CapSense_RAW_FILTER_MASK & CapSense_MEDIAN_FILTER) */
+ 443   1          
+ 444   1          #if (CapSense_TUNING_METHOD == CapSense_AUTO_TUNING)
+ 445   1              CapSense_CalculateThresholds(sensor);
+ 446   1          #endif /* End (CapSense_TUNING_METHOD == CapSense_AUTO_TUNING) */
+ 447   1      
+ 448   1      
+ 449   1          /* Baseline calculation */
+ 450   1          /* Calculate difference RawData[cur] - Baseline[prev] */
+ 451   1          if(filteredRawData >= CapSense_SensorBaseline[sensor])
+ 452   1          {
+ 453   2              tempRaw = filteredRawData - CapSense_SensorBaseline[sensor];
+ 454   2              widget = 1u;    /* Positive difference - Calculate the Signal */
+ 455   2          }
+ 456   1          else
+ 457   1          {
+ 458   2              tempRaw = CapSense_SensorBaseline[sensor] - filteredRawData;
+ 459   2              widget = 0u;    /* Negative difference - Do NOT calculate the Signal */
+ 460   2          }
+ 461   1      
+ 462   1          if((widget == 0u) && (tempRaw > (uint16) CapSense_NEGATIVE_NOISE_THRESHOLD))
+ 463   1          {
+ 464   2              if(CapSense_LowBaselineResetCnt[sensor] >= CapSense_LOW_BASELINE_RESET)
+ 465   2              {
+ 466   3                  CapSense_BaseInit(sensor);
+ 467   3                  CapSense_LowBaselineResetCnt[sensor] = 0;
+ 468   3              }
+ 469   2              else
+ 470   2              {
+ 471   3                  CapSense_LowBaselineResetCnt[sensor]++;
+ 472   3              }
+ 473   2          }
+ 474   1          else
+ 475   1          {
+ 476   2              #if (CapSense_AUTO_RESET == CapSense_AUTO_RESET_DISABLE)
+ 477   2                  /* Update Baseline if lower that noiseThreshold */
+ 478   2                  if ( (tempRaw <= (uint16) noiseThreshold) || 
+ 479   2                       ((tempRaw < (uint16) CapSense_NEGATIVE_NOISE_THRESHOLD)
+ 480   2                         && widget == 0))
+ 481   2                  {
+ 482   3              #endif /* (CapSense_AUTO_RESET == CapSense_AUTO_RESET_DISABLE) */
+ 483   3                      /* Make full Baseline 23 bits */
+ 484   3                      calc = (uint32) CapSense_SensorBaseline[sensor] << 8u;
+ 485   3                      calc |= (uint32) CapSense_SensorBaselineLow[sensor];
+ 486   3      
+ 487   3                      /* Add Raw Data to Baseline */
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 9   
+
+ 488   3                      calc += filteredRawData;
+ 489   3      
+ 490   3                      /* Sub the high Baseline */
+ 491   3                      calc -= CapSense_SensorBaseline[sensor];
+ 492   3      
+ 493   3                      /* Put Baseline and BaselineLow */
+ 494   3                      CapSense_SensorBaseline[sensor] = ((uint16) (calc >> 8u));
+ 495   3                      CapSense_SensorBaselineLow[sensor] = ((uint8) calc);
+ 496   3      
+ 497   3                      CapSense_LowBaselineResetCnt[sensor] = 0;
+ 498   3              #if (CapSense_AUTO_RESET == CapSense_AUTO_RESET_DISABLE)
+ 499   3                  }
+ 500   2              #endif /* (CapSense_AUTO_RESET == CapSense_AUTO_RESET_DISABLE) */
+ 501   2          }
+ 502   1      
+ 503   1          /* Calculate Signal if possitive difference > noiseThreshold */
+ 504   1          if((tempRaw > (uint16) noiseThreshold) && (widget != 0u))
+ 505   1          {
+ 506   2              #if (CapSense_SIGNAL_SIZE == CapSense_SIGNAL_SIZE_UINT8)
+ 507   2                  /* Over flow defence for uint8 */
+ 508   2                  if (tempRaw > 0xFFu)
+ 509   2                  {
+ 510   3                      CapSense_SensorSignal[sensor] = 0xFFu;
+ 511   3                  }    
+ 512   2                  else 
+ 513   2                  {
+ 514   3                      CapSense_SensorSignal[sensor] = ((uint8) tempRaw);
+ 515   3                  }
+ 516   2              #else
+                          CapSense_SensorSignal[sensor] = ((uint16) tempRaw);
+                      #endif  /* End (CapSense_SIGNAL_SIZE == CapSense_SIGNAL_SIZE_UINT8) */
+ 519   2          }
+ 520   1          else
+ 521   1          {
+ 522   2              /* Signal is zero */
+ 523   2              CapSense_SensorSignal[sensor] = 0u;
+ 524   2          }
+ 525   1      
+ 526   1          #if (CapSense_TOTAL_GENERICS_COUNT)
+                      /* Exclude generic widget */
+                      }
+                  #endif  /* End CapSense_TOTAL_GENERICS_COUNT */
+ 530   1      }
+ 531          
+ 532          
+ 533          /*******************************************************************************
+ 534          * Function Name: CapSense_UpdateEnabledBaselines
+ 535          ********************************************************************************
+ 536          *
+ 537          * Summary:
+ 538          *  Checks CapSense_SensorEnableMask[] array and calls the 
+ 539          *  CapSense_UpdateSensorBaseline function to update the baselines 
+ 540          *  for enabled sensors.
+ 541          *
+ 542          * Parameters:
+ 543          *  None
+ 544          *
+ 545          * Return:
+ 546          *  None
+ 547          *
+ 548          * Global Variables:
+ 549          *  CapSense_SensorEnableMask[] - used to store the sensor scanning 
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 10  
+
+ 550          *  state.
+ 551          *  CapSense_SensorEnableMask[0] contains the masked bits for sensors 
+ 552          *   0 through 7 (sensor 0 is bit 0, sensor 1 is bit 1).
+ 553          *  CapSense_SensorEnableMask[1] contains the masked bits for 
+ 554          *  sensors 8 through 15 (if needed), and so on.
+ 555          *  0 - sensor doesn't scan by CapSense_ScanEnabledWidgets().
+ 556          *  1 - sensor scans by CapSense_ScanEnabledWidgets().
+ 557          *
+ 558          * Reentrant:
+ 559          *  No
+ 560          *
+ 561          *******************************************************************************/
+ 562           void CapSense_UpdateEnabledBaselines(void)
+ 563          {
+ 564   1          uint8 i;
+ 565   1          uint8 pos;
+ 566   1          uint8 enMask;
+ 567   1          
+ 568   1          for(i = 0; i < CapSense_TOTAL_SENSOR_COUNT; i++)
+ 569   1          {
+ 570   2              pos = (i >> 3u);
+ 571   2              enMask = 0x01u << (i & 0x07u);
+ 572   2              if((CapSense_SensorEnableMask[pos] & enMask) != 0u)
+ 573   2              {
+ 574   3                  CapSense_UpdateSensorBaseline(i);
+ 575   3              }
+ 576   2          }
+ 577   1      }
+ 578          
+ 579          
+ 580          /*******************************************************************************
+ 581          * Function Name: CapSense_CheckIsSensorActive
+ 582          ********************************************************************************
+ 583          *
+ 584          * Summary:
+ 585          *  Compares the CapSense_SensorSignal[sensor] array element to finger
+ 586          *  threshold of widget it belongs to. The hysteresis and debounce are taken into 
+ 587          *  account. The hysteresis is added or subtracted from the finger threshold 
+ 588          *  based on whether the sensor is currently active. 
+ 589          *  If the sensor is active, the threshold is lowered by the hysteresis amount.
+ 590          *  If the sensor is inactive, the threshold is raised by the hysteresis amount.
+ 591          *  The debounce counter added to the sensor active transition.
+ 592          *  This function updates CapSense_SensorOnMask[] array element.
+ 593          *
+ 594          * Parameters:
+ 595          *  sensor:  Sensor number.
+ 596          *
+ 597          * Return:
+ 598          *  Returns sensor state 1 if active, 0 if not active.
+ 599          *
+ 600          * Global Variables:
+ 601          *  CapSense_SensorSignal[]      - used to store diffence between 
+ 602          *  current value of raw data and previous value of baseline.
+ 603          *  CapSense_debounceCounter[]   - used to store current debounce 
+ 604          *  counter of sensor. Widget which has this parameter are buttons, matrix 
+ 605          *  buttons, proximity, guard. All other widgets haven't debounce parameter
+ 606          *  and use the last element of this array with value 0 (it means no debounce).
+ 607          *  CapSense_SensorOnMask[] - used to store sensors on/off state.
+ 608          *  CapSense_SensorOnMask[0] contains the masked bits for sensors 
+ 609          *   0 through 7 (sensor 0 is bit 0, sensor 1 is bit 1).
+ 610          *  CapSense_SensorEnableMask[1] contains the masked bits for 
+ 611          *  sensors 8 through 15 (if needed), and so on.
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 11  
+
+ 612          *  0 - sensor is inactive.
+ 613          *  1 - sensor is active.
+ 614          *
+ 615          * Reentrant:
+ 616          *  No
+ 617          *
+ 618          *******************************************************************************/
+ 619          uint8 CapSense_CheckIsSensorActive(uint8 sensor)
+ 620          {
+ 621   1          uint8 debounceIndex;
+ 622   1          /* Get On/Off mask */
+ 623   1          uint8 pos = (sensor >> 3u);
+ 624   1          uint8 onMask = 0x01u << (sensor & 0x07u);
+ 625   1          /* Prepare to find debounce counter index */
+ 626   1          uint8 widget = CapSense_widgetNumber[sensor];
+ 627   1          uint8 fingerThreshold = CapSense_fingerThreshold[widget];
+ 628   1          uint8 hysteresis = CapSense_hysteresis[widget];
+ 629   1          uint8 debounce = CapSense_debounce[widget];
+ 630   1          
+ 631   1          debounceIndex = widget;
+ 632   1      
+ 633   1          
+ 634   1          /* Was on */
+ 635   1          if (CapSense_SensorOnMask[pos] & onMask)
+ 636   1          {
+ 637   2              /* Hysteresis minus */
+ 638   2              if (CapSense_SensorSignal[sensor] < (fingerThreshold - hysteresis))
+ 639   2              {
+ 640   3                  CapSense_SensorOnMask[pos] &= ~onMask;
+ 641   3                  CapSense_debounceCounter[debounceIndex] = debounce; 
+ 642   3              }
+ 643   2          }
+ 644   1          else    /* Was off */
+ 645   1          {
+ 646   2              /* Hysteresis plus */
+ 647   2              if (CapSense_SensorSignal[sensor] > (fingerThreshold + hysteresis))
+ 648   2              {
+ 649   3                  /* Sensor active, decrement debounce counter */
+ 650   3                  if (CapSense_debounceCounter[debounceIndex]-- <= 1u)
+ 651   3                  {
+ 652   4                      CapSense_SensorOnMask[pos] |= onMask; 
+ 653   4                  }
+ 654   3              }
+ 655   2              else
+ 656   2              {
+ 657   3                  /* Sensor inactive - reset Debounce counter */
+ 658   3                  CapSense_debounceCounter[debounceIndex] = debounce;
+ 659   3              }
+ 660   2          }
+ 661   1          
+ 662   1          return (CapSense_SensorOnMask[pos] & onMask) ? 1u : 0u;
+ 663   1      }
+ 664          
+ 665          
+ 666          /*******************************************************************************
+ 667          * Function Name: CapSense_CheckIsWidgetActive
+ 668          ********************************************************************************
+ 669          *
+ 670          * Summary:
+ 671          *  Use function CapSense_CheckIsSensorActive() to update 
+ 672          *  CapSense_SensorOnMask[] for all sensors within the widget.
+ 673          *  If one of sensors within widget is active the function return that widget is 
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 12  
+
+ 674          *  active.
+ 675          *  The touch pad and matrix buttons widgets need to have active sensor within 
+ 676          *  col and row to return widget active status.
+ 677          *
+ 678          * Parameters:
+ 679          *  widget:  widget number.
+ 680          *
+ 681          * Return:
+ 682          *  Returns widget sensor state 1 if one or more sensors within widget is/are 
+ 683          *  active, 0 if all sensors within widget are inactive.
+ 684          *
+ 685          * Reentrant:
+ 686          *  No
+ 687          *
+ 688          *******************************************************************************/
+ 689          uint8 CapSense_CheckIsWidgetActive(uint8 widget)
+ 690          {
+ 691   1          uint8 rawIndex = CapSense_rawDataIndex[widget];
+ 692   1          uint8 numberOfSensors = CapSense_numberOfSensors[widget] + rawIndex;
+ 693   1          uint8 state = 0u;
+ 694   1      
+ 695   1          /* Check all sensors of the widget */
+ 696   1          do
+ 697   1          {
+ 698   2              if(CapSense_CheckIsSensorActive(rawIndex) != 0u)
+ 699   2              {
+ 700   3                  state = CapSense_SENSOR_1_IS_ACTIVE;
+ 701   3              }
+ 702   2              rawIndex++;
+ 703   2          }
+ 704   1          while(rawIndex < numberOfSensors);
+ 705   1          
+ 706   1      
+ 707   1          
+ 708   1          return state;
+ 709   1      }
+ 710          
+ 711          
+ 712          /*******************************************************************************
+ 713          * Function Name: CapSense_CheckIsAnyWidgetActive
+ 714          ********************************************************************************
+ 715          *
+ 716          * Summary:
+ 717          *  Compares all sensors of the CapSense_Signal[] array to their finger 
+ 718          *  threshold. Calls CapSense_CheckIsWidgetActive() for each widget so 
+ 719          *  the CapSense_SensorOnMask[] array is up to date after calling this 
+ 720          *  function.
+ 721          *
+ 722          * Parameters:
+ 723          *  widget:  widget number.
+ 724          *
+ 725          * Return:
+ 726          *  Returns 1 if any widget is active, 0 none of widgets are active.
+ 727          *
+ 728          * Reentrant:
+ 729          *  No
+ 730          *
+ 731          *******************************************************************************/
+ 732          uint8 CapSense_CheckIsAnyWidgetActive(void)
+ 733          {
+ 734   1          uint8 i;
+ 735   1          uint8 state = 0u;
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 13  
+
+ 736   1          
+ 737   1          for(i = 0u; i < CapSense_TOTAL_WIDGET_COUNT; i++)
+ 738   1          {
+ 739   2              if (CapSense_CheckIsWidgetActive(i) != 0u)
+ 740   2              {
+ 741   3                  state = CapSense_WIDGET_IS_ACTIVE;
+ 742   3              }
+ 743   2          }
+ 744   1          
+ 745   1      
+ 746   1          return state;
+ 747   1      }
+ 748          
+ 749          
+ 750          /*******************************************************************************
+ 751          * Function Name: CapSense_EnableWidget
+ 752          ********************************************************************************
+ 753          *
+ 754          * Summary:
+ 755          *  Enable all widget elements (sensors) to scanning process.
+ 756          *
+ 757          * Parameters:
+ 758          *  widget:  widget number.
+ 759          *
+ 760          * Return:
+ 761          *  None
+ 762          *
+ 763          * Global Variables:
+ 764          *  CapSense_SensorEnableMask[] - used to store the sensor scanning 
+ 765          *  state.
+ 766          *  CapSense_SensorEnableMask[0] contains the masked bits for sensors 
+ 767          *  0 through 7 (sensor 0 is bit 0, sensor 1 is bit 1).
+ 768          *  CapSense_SensorEnableMask[1] contains the masked bits for 
+ 769          *  sensors 8 through 15 (if needed), and so on.
+ 770          *  0 - sensor doesn't scan by CapSense_ScanEnabledWidgets().
+ 771          *  1 - sensor scans by CapSense_ScanEnabledWidgets().
+ 772          *
+ 773          * Reentrant:
+ 774          *  No
+ 775          *
+ 776          *******************************************************************************/
+ 777          void CapSense_EnableWidget(uint8 widget)
+ 778          {
+ 779   1          uint8 pos;
+ 780   1          uint8 enMask;
+ 781   1          uint8 rawIndex = CapSense_rawDataIndex[widget];
+ 782   1          uint8 numberOfSensors = CapSense_numberOfSensors[widget] + rawIndex;
+ 783   1          
+ 784   1          /* Enable all sensors of the widget */
+ 785   1          do
+ 786   1          {
+ 787   2              pos = (rawIndex >> 3u);
+ 788   2              enMask = 0x01u << (rawIndex & 0x07u);
+ 789   2              
+ 790   2              CapSense_SensorEnableMask[pos] |= enMask;
+ 791   2              rawIndex++;
+ 792   2          }
+ 793   1          while(rawIndex < numberOfSensors);
+ 794   1          
+ 795   1      
+ 796   1      }
+ 797          
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 14  
+
+ 798          
+ 799          /*******************************************************************************
+ 800          * Function Name: CapSense_DisableWidget
+ 801          ********************************************************************************
+ 802          *
+ 803          * Summary:
+ 804          *  Disable all widget elements (sensors) from scanning process.
+ 805          *
+ 806          * Parameters:
+ 807          *  widget:  widget number.
+ 808          *
+ 809          * Return:
+ 810          *  None
+ 811          *
+ 812          * Global Variables:
+ 813          *  CapSense_SensorEnableMask[] - used to store the sensor scanning 
+ 814          *  state.
+ 815          *  CapSense_SensorEnableMask[0] contains the masked bits for sensors 
+ 816          *  0 through 7 (sensor 0 is bit 0, sensor 1 is bit 1).
+ 817          *  CapSense_SensorEnableMask[1] contains the masked bits for 
+ 818          *  sensors 8 through 15 (if needed), and so on.
+ 819          *  0 - sensor doesn't scan by CapSense_ScanEnabledWidgets().
+ 820          *  1 - sensor scans by CapSense_ScanEnabledWidgets().
+ 821          *
+ 822          * Reentrant:
+ 823          *  No
+ 824          *
+ 825          *******************************************************************************/
+ 826          void CapSense_DisableWidget(uint8 widget)
+ 827          {
+ 828   1          uint8 pos;
+ 829   1          uint8 enMask;
+ 830   1          uint8 rawIndex = CapSense_rawDataIndex[widget];
+ 831   1          uint8 numberOfSensors = CapSense_numberOfSensors[widget] + rawIndex;
+ 832   1         
+ 833   1          /* Disable all sensors of the widget */
+ 834   1          do
+ 835   1          {
+ 836   2              pos = (rawIndex >> 3u);
+ 837   2              enMask = 0x01u << (rawIndex & 0x07u);
+ 838   2              
+ 839   2              CapSense_SensorEnableMask[pos] &= ~enMask;
+ 840   2              rawIndex++;
+ 841   2          }
+ 842   1          while(rawIndex < numberOfSensors);
+ 843   1          
+ 844   1      
+ 845   1      }
+ 846          #if(CapSense_TOTAL_CENTROIDS_COUNT)
+                  /*******************************************************************************
+                  * Function Name: CapSense_FindMaximum
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  Finds index of maximum element within defined centroid. Checks 
+                  *  CapSense_SensorSignal[] within defined cenrtoid and 
+                  *  returns index of maximum element. The values below finger threshold are 
+                  *  ignored.
+                  *  The centrod defines by offset of first element and number of elements - count.
+                  *  The diplexed centroid requires at least consecutive two elements above
+                  *  FingerThreshold to find index of maximum element.
+                  * 
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 15  
+
+                  * Parameters:
+                  *  offset:  Start index of cetroid in CapSense_SensorSignal[] array.
+                  *  count:   number of elements within centroid.
+                  *  fingerThreshold:  Finger threshould.
+                  *  diplex:   pointer to diplex table.
+                  * 
+                  * Return:
+                  *  Returns index of maximum element within defined centroid.
+                  *  If index of maximum element doesn't find the 0xFF returns.
+                  * 
+                  *******************************************************************************/
+                  #if (CapSense_IS_DIPLEX_SLIDER)
+                      uint8 CapSense_FindMaximum(uint8 offset, uint8 count, uint8 fingerThreshold, const uint8 CYCODE *d
+             -iplex)
+                  #else 
+                      uint8 CapSense_FindMaximum(uint8 offset, uint8 count, uint8 fingerThreshold)
+                  #endif
+                  {
+                      uint8 i;
+                      #if (CapSense_IS_DIPLEX_SLIDER)        
+                          uint8 curPos = 0u;
+                          /* No centroid at the Start */
+                          uint8 curCntrdSize = 0u;
+                          uint8 curCtrdStartPos = 0xFFu;
+                          /* The biggset centroid is zero */
+                          uint8 biggestCtrdSize = 0u;
+                          uint8 biggestCtrdStartPos = 0u;
+                      #endif
+                      uint8 maximum = 0xFFu;
+                      uint8 temp = 0u;
+                      uint8 *startOfSlider = &CapSense_SensorSignal[offset]; 
+              
+                      #if (CapSense_IS_DIPLEX_SLIDER)        
+                          if(diplex != 0u)
+                          {
+                              /* Initialize */
+                              i = 0u;
+                              
+                              /* Make slider x2 as Diplexed */
+                              count <<= 1u;
+                              while(1u)
+                              { 
+                                  if (startOfSlider[curPos] > 0u)    /* Looking for centroids */
+                                  {
+                                      if (curCtrdStartPos == 0xFFu)
+                                      {
+                                          /* Start of centroid */
+                                          curCtrdStartPos = i;
+                                          curCntrdSize++;
+                                      }
+                                      else
+                                      {
+                                          curCntrdSize++;
+                                      }
+                                  }
+                                  else   /* Select the bigest and indicate zero start */
+                                  {          
+                                      if(curCntrdSize > 0)
+                                      {
+                                          /* We are in the end of current */
+                                          if(curCntrdSize > biggestCtrdSize)
+                                          {
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 16  
+
+                                              biggestCtrdSize = curCntrdSize;
+                                              biggestCtrdStartPos = curCtrdStartPos;
+                                          }
+                                          
+                                          curCntrdSize = 0u;
+                                          curCtrdStartPos = 0xFFu;
+                                      }
+                                  }
+                                  
+                                  i++; 
+                                  curPos = diplex[i];
+                                  if(i == count)
+                                  {
+                                      break;
+                                  }            
+                              }
+                                  
+                                  /* Find the biggest centroid if two are the same size, last one wins
+                                     We are in the end of current */
+                              if (curCntrdSize >= biggestCtrdSize) 
+                              {
+                                  biggestCtrdSize = curCntrdSize;
+                                  biggestCtrdStartPos = curCtrdStartPos;
+                              }
+                          }
+                          else
+                          {
+                              /* Without diplexing */ 
+                              biggestCtrdSize = count;
+                          }
+                                      
+              
+                          /* Check centroid size */
+                          #if (CapSense_IS_NON_DIPLEX_SLIDER)
+                              if((biggestCtrdSize >= 2u) || ((biggestCtrdSize == 1u) && (diplex == 0u)))
+                          #else                    
+                              if(biggestCtrdSize >= 2u)
+                          #endif
+                              {
+                                  for (i = biggestCtrdStartPos; i < (biggestCtrdStartPos + biggestCtrdSize); i++)
+                                  {
+                                      #if (CapSense_IS_DIPLEX_SLIDER && CapSense_IS_NON_DIPLEX_SLIDER)                  
+             -  
+                                          if (diplex == 0u)
+                                          {
+                                              curPos = i;
+                                          }
+                                          else
+                                          {
+                                              curPos = diplex[i];
+                                          }                    
+                                      #elif (CapSense_IS_DIPLEX_SLIDER)                    
+                                          curPos = diplex[i];                    
+                                      #endif
+                                      /* Looking for the grater element within centroid */
+                                      if(startOfSlider[curPos] > fingerThreshold)
+                                      {
+                                          if(startOfSlider[curPos] > temp)
+                                          {
+                                              maximum = i;
+                                              temp = startOfSlider[curPos];
+                                          }
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 17  
+
+                                      }
+                                  }
+                              } 
+                      #else
+                          for (i = 0u; i < count; i++)
+                          {                      
+                              /* Looking for the grater element within centroid */
+                              if(startOfSlider[i] > fingerThreshold)
+                              {
+                                  if(startOfSlider[i] > temp)
+                                  {
+                                      maximum = i;
+                                      temp = startOfSlider[i];
+                                  }
+                              }
+                          }    
+                      #endif
+                      return (maximum);
+                  }
+                  
+                  
+                  /*******************************************************************************
+                  * Function Name: CapSense_CalcCentroid
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  Returns position value calculated accoring index of maximum element and API
+                  *  resolution.
+                  *
+                  * Parameters:
+                  *  type:  widget type.
+                  *  diplex:  pointer to diplex table.
+                  *  maximum:  Index of maximum element within centroid.
+                  *  offset:   Start index of cetroid in CapSense_SensorSignal[] array.
+                  *  count:    Number of elements within centroid.
+                  *  resolution:  multiplicator calculated according to centroid type and
+                  *  API resolution.
+                  *  noiseThreshold:  Noise threshould.
+                  * 
+                  * Return:
+                  *  Returns position value of the slider.
+                  * 
+                  *
+                  * Reentrant:
+                  *  No.
+                  *
+                  *******************************************************************************/
+                  uint8 CapSense_CalcCentroid(uint8 maximum, uint8 offset, uint8 count, uint16 resolution, uint8 noiseTh
+             -reshold)
+                  {
+                      #if ((CapSense_TOTAL_LINEAR_SLIDERS_COUNT > 0u) || (CapSense_TOTAL_TOUCH_PADS_COUNT > 0u))        
+             -        
+                          uint8 posPrev;
+                          uint8 posNext;
+                      #endif
+                             
+                      #if (CapSense_IS_DIPLEX_SLIDER)                
+                          uint8 pos;
+                      #endif
+              
+                      uint8 position;
+                      int32 numerator;
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 18  
+
+                      int32 denominator;
+                      uint8 *startOfSlider = &CapSense_SensorSignal[offset];
+                                  
+                      #if (CapSense_ADD_SLIDER_TYPE)
+                          if(type == CapSense_TYPE_RADIAL_SLIDER)
+                          {
+                      #endif
+              
+                          #if (CapSense_TOTAL_RADIAL_SLIDERS_COUNT > 0u)                
+                              /* Copy Signal for found centriod */
+                              CapSense_centroid[CapSense_POS] = startOfSlider[maximum];
+                               
+                              /* Check borders for ROTARY Slider */
+                              if (maximum == 0u)                   /* Start of centroid */
+                              { 
+                                  CapSense_centroid[CapSense_POS_PREV] = startOfSlider[count - 1u];
+                                  CapSense_centroid[CapSense_POS_NEXT] = startOfSlider[maximum + 1u];
+                              }
+                              else if (maximum == (count - 1u))    /* End of centroid */
+                              {
+                                  CapSense_centroid[CapSense_POS_PREV] = startOfSlider[maximum - 1u];
+                                  CapSense_centroid[CapSense_POS_NEXT] = startOfSlider[0u];
+                              }
+                              else                                /* Not first Not last */
+                              {
+                                  CapSense_centroid[CapSense_POS_PREV] = startOfSlider[maximum - 1u];
+                                  CapSense_centroid[CapSense_POS_NEXT] = startOfSlider[maximum + 1u];
+                              }
+                          #endif
+              
+                      #if (CapSense_ADD_SLIDER_TYPE)
+                          }
+                          else
+                          {
+                      #endif
+              
+                          #if ((CapSense_TOTAL_LINEAR_SLIDERS_COUNT > 0u) || (CapSense_TOTAL_TOUCH_PADS_COUNT > 0u))
+                              #if (CapSense_IS_DIPLEX_SLIDER && CapSense_IS_NON_DIPLEX_SLIDER)                    
+                                  /* Calculate next and previous near to maximum */
+                                  if(diplex == 0u)
+                                  {
+                                      pos     = maximum;
+                                      posPrev = maximum - 1u;
+                                      posNext = maximum + 1u; 
+                                  }
+                                  else
+                                  {
+                                      pos     = diplex[maximum];
+                                      posPrev = diplex[maximum - 1u];
+                                      posNext = diplex[maximum + 1u];
+                                      count <<= 1u;
+                                  }                    
+                              #elif (CapSense_IS_DIPLEX_SLIDER)
+                                  /* Calculate next and previous near to maximum */
+                                  pos     = diplex[maximum];
+                                  posPrev = diplex[maximum - 1u];
+                                  posNext = diplex[maximum + 1u];
+                                  count <<= 1u;                    
+                              #else                    
+                                  /* Calculate next and previous near to maximum */
+                                  posPrev = maximum - 1u;
+                                  posNext = maximum + 1u; 
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 19  
+
+                              #endif
+                                      
+                              /* Copy Signal for found centriod */
+                              #if (CapSense_IS_DIPLEX_SLIDER)
+                                  CapSense_centroid[CapSense_POS] = startOfSlider[pos];
+                              #else
+                                  CapSense_centroid[CapSense_POS] = startOfSlider[maximum];
+                              #endif
+                                  
+                              /* Check borders for LINEAR Slider */
+                              if (maximum == 0u)                   /* Start of centroid */
+                              { 
+                                  CapSense_centroid[CapSense_POS_PREV] = 0u;
+                                  CapSense_centroid[CapSense_POS_NEXT] = startOfSlider[posNext];
+                              }
+                              else if (maximum == ((count) - 1u)) /* End of centroid */
+                              {
+                                  CapSense_centroid[CapSense_POS_PREV] = startOfSlider[posPrev];
+                                  CapSense_centroid[CapSense_POS_NEXT] = 0u;
+                              }
+                              else                                /* Not first Not last */
+                              {
+                                  CapSense_centroid[CapSense_POS_PREV] = startOfSlider[posPrev];
+                                  CapSense_centroid[CapSense_POS_NEXT] = startOfSlider[posNext];
+                              }
+                          #endif
+              
+                      #if (CapSense_ADD_SLIDER_TYPE)
+                          }
+                      #endif
+                  
+                      /* Subtract noiseThreshold */
+                      if(CapSense_centroid[CapSense_POS_PREV] > noiseThreshold)
+                      {
+                          CapSense_centroid[CapSense_POS_PREV] -= noiseThreshold;
+                      }
+                      else
+                      {
+                          CapSense_centroid[CapSense_POS_PREV] = 0u;
+                      }
+                      
+                      /* Maximum always grater than fingerThreshold, so grate than noiseThreshold */
+                      CapSense_centroid[CapSense_POS] -= noiseThreshold;
+                      
+                      /* Subtract noiseThreshold */
+                      if(CapSense_centroid[CapSense_POS_NEXT] > noiseThreshold)
+                      {
+                          CapSense_centroid[CapSense_POS_NEXT] -= noiseThreshold;
+                      }
+                      else
+                      {
+                          CapSense_centroid[CapSense_POS_NEXT] = 0u;
+                      }
+                      
+                      
+                      /* Si+1 - Si-1 */
+                      numerator = (int32) CapSense_centroid[CapSense_POS_NEXT] - 
+                                  (int32) CapSense_centroid[CapSense_POS_PREV];
+                      
+                      /* Si+1 + Si + Si-1 */
+                      denominator = (int32) CapSense_centroid[CapSense_POS_PREV] + 
+                                    (int32) CapSense_centroid[CapSense_POS] + 
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 20  
+
+                                    (int32) CapSense_centroid[CapSense_POS_NEXT];
+                      
+                      /* (numerator/denominator) + maximum */
+                      denominator = (numerator << 8u)/denominator + ((uint16) maximum << 8u);
+                      
+                      #if(CapSense_TOTAL_RADIAL_SLIDERS_COUNT > 0u)
+                          /* Only required for RADIAL Slider */
+                          if(denominator < 0)
+                          {
+                              denominator += ((uint16) count << 8u);
+                          }
+                      #endif
+                      
+                      denominator *= resolution;
+                      
+                      /* Round the relust and put it to uint8 */
+                      position = ((uint8) HI16(denominator + CapSense_CENTROID_ROUND_VALUE));
+              
+                      return (position);
+                  }    
+              #endif
+1187          
+1188          
+1189          #if(CapSense_TOTAL_LINEAR_SLIDERS_COUNT > 0u)
+                  /*******************************************************************************
+                  * Function Name: CapSense_GetCentroidPos
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  Checks the CapSense_Signal[ ] array for a centroid within
+                  *  slider specified range. The centroid position is calculated to the resolution
+                  *  specified in the CapSense customizer. The position filters are applied to the
+                  *  result if enabled.
+                  *
+                  * Parameters:
+                  *  widget:  Widget number.
+                  *  For every linear slider widget there are defines in this format:
+                  *  #define CapSense_LS__"widget_name"            5
+                  * 
+                  * Return:
+                  *  Returns position value of the linear slider.
+                  *
+                  * Side Effects:
+                  *  If any sensor within the slider widget is active, the function returns values
+                  *  from zero to the API resolution value set in the CapSense customizer. If no
+                  *  sensors are active, the function returns 0xFFFF. If an error occurs during
+                  *  execution of the centroid/diplexing algorithm, the function returns 0xFFFF.
+                  *  There are no checks of widget type argument provided to this function.
+                  *  The unproper widget type provided will cause unexpected position calculations.
+                  *
+                  * Note:
+                  *  If noise counts on the slider segments are greater than the noise
+                  *  threshold, this subroutine may generate a false centroid result. The noise
+                  *  threshold should be set carefully (high enough above the noise level) so
+                  *  that noise will not generate a false centroid.
+                  *
+                  * Reentrant:
+                  *  No.
+                  *
+                  *******************************************************************************/
+                  uint16 CapSense_GetCentroidPos(uint8 widget)
+                  {
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 21  
+
+                      #if (CapSense_IS_DIPLEX_SLIDER)
+                          const uint8 CYCODE *diplex;
+                      #endif
+                              
+                      #if (0u != CapSense_LINEAR_SLIDERS_POS_FILTERS_MASK)
+                          uint8 posIndex;
+                          uint8 firstTimeIndex = CapSense_posFiltersData[widget];
+                          uint8 posFiltersMask = CapSense_posFiltersMask[widget];  
+              
+                      #endif
+                      #if ((0u != (CapSense_MEDIAN_FILTER & CapSense_LINEAR_SLIDERS_POS_FILTERS_MASK)) || \
+                           (0u != (CapSense_AVERAGING_FILTER & CapSense_LINEAR_SLIDERS_POS_FILTERS_MASK)))
+                          uint8 tempPos;
+                      #endif
+              
+                      uint8 maximum;
+                      uint16 position;
+                      uint8 offset = CapSense_rawDataIndex[widget];
+                      uint8 count = CapSense_numberOfSensors[widget];
+                                      
+                      #if (CapSense_IS_DIPLEX_SLIDER)
+                          if(widget < CapSense_TOTAL_DIPLEXED_SLIDERS_COUNT)
+                          {
+                              maximum = CapSense_diplexTable[widget];
+                              diplex = &CapSense_diplexTable[maximum];
+                          }
+                          else
+                          {
+                              diplex = 0u;
+                          }
+                      #endif
+              
+                      /* Find Maximum within centroid */      
+                      #if (CapSense_IS_DIPLEX_SLIDER)        
+                          maximum = CapSense_FindMaximum(offset, count, CapSense_fingerThreshold[widget], diplex);      
+             -  
+                      #else
+                          maximum = CapSense_FindMaximum(offset, count, CapSense_fingerThreshold[widget]);
+                      #endif
+              
+                      if (maximum != 0xFFu)
+                      {
+                          /* Calculate centroid */
+                          position = (uint16) CapSense_CalcCentroid(maximum, 
+                                       offset, count, CapSense_centroidMult[widget], CapSense_noiseThreshold[widget]);
+              
+                          #if (0u != CapSense_LINEAR_SLIDERS_POS_FILTERS_MASK)
+                              /* Check if this linear slider has enabled filters */
+                              if (0u != (posFiltersMask & CapSense_ANY_POS_FILTER))
+                              {
+                                  /* Caluclate position to store filters data */
+                                  posIndex  = firstTimeIndex + 1u;
+                                  
+                                  if (0u == CapSense_posFiltersData[firstTimeIndex])
+                                  {
+                                      /* Init filters */
+                                      CapSense_posFiltersData[posIndex] = (uint8) position;
+                                      #if ((0u != (CapSense_MEDIAN_FILTER & CapSense_LINEAR_SLIDERS_POS_FILTERS_MASK)) |
+             -| \
+                                           (0u != (CapSense_AVERAGING_FILTER & CapSense_LINEAR_SLIDERS_POS_FILTERS_MASK)
+             -))
+                                          if ( (0u != (posFiltersMask & CapSense_MEDIAN_FILTER)) || 
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 22  
+
+                                               (0u != (posFiltersMask & CapSense_AVERAGING_FILTER)) )
+                                          {
+                                              CapSense_posFiltersData[posIndex + 1u] = (uint8) position;
+                                          }
+                                      #endif
+                                      
+                                      CapSense_posFiltersData[firstTimeIndex] = 1u;
+                                  }
+                                  else
+                                  {
+                                      /* Do filtering */
+                                      #if (0u != (CapSense_MEDIAN_FILTER & CapSense_LINEAR_SLIDERS_POS_FILTERS_MASK))   
+             -                 
+                                          if (0u != (posFiltersMask & CapSense_MEDIAN_FILTER))
+                                          {
+                                              tempPos = (uint8) position;
+                                              position = CapSense_MedianFilter(position, CapSense_posFiltersData[posInde
+             -x], CapSense_posFiltersData[posIndex + 1u]);
+                                              CapSense_posFiltersData[posIndex + 1u] = CapSense_posFiltersData[posIndex]
+             -;
+                                              CapSense_posFiltersData[posIndex] = tempPos;
+                                          }
+                                      #endif
+              
+                                      #if (0u != (CapSense_AVERAGING_FILTER & CapSense_LINEAR_SLIDERS_POS_FILTERS_MASK))
+             -                        
+                                          if (0u != (posFiltersMask & CapSense_AVERAGING_FILTER)) 
+                                          {
+                                              tempPos = (uint8) position;
+                                              position = CapSense_AveragingFilter(position, CapSense_posFiltersData[posI
+             -ndex], CapSense_posFiltersData[posIndex + 1u]);
+                                              CapSense_posFiltersData[posIndex + 1u] = CapSense_posFiltersData[posIndex]
+             -;
+                                              CapSense_posFiltersData[posIndex] = tempPos;
+                                          }
+                                      #endif
+              
+                                      #if (0u != (CapSense_IIR2_FILTER & CapSense_LINEAR_SLIDERS_POS_FILTERS_MASK)) 
+                                          if (0u != (posFiltersMask & CapSense_IIR2_FILTER)) 
+                                          {
+                                              position = CapSense_IIR2Filter(position, CapSense_posFiltersData[posIndex]
+             -);
+                                              CapSense_posFiltersData[posIndex] = (uint8) position;
+                                          }
+                                      #endif
+              
+                                      #if (0u != (CapSense_IIR4_FILTER & CapSense_LINEAR_SLIDERS_POS_FILTERS_MASK))
+                                          if (0u != (posFiltersMask & CapSense_IIR4_FILTER))
+                                          {
+                                              position = CapSense_IIR4Filter(position, CapSense_posFiltersData[posIndex]
+             -);
+                                              CapSense_posFiltersData[posIndex] = (uint8) position;
+                                          }                                
+                                      #endif
+              
+                                      #if (0u != (CapSense_JITTER_FILTER & CapSense_LINEAR_SLIDERS_POS_FILTERS_MASK))   
+             -                     
+                                          if (0u != (posFiltersMask & CapSense_JITTER_FILTER))
+                                          {
+                                              position = CapSense_JitterFilter(position, CapSense_posFiltersData[posInde
+             -x]);
+                                              CapSense_posFiltersData[posIndex] = (uint8) position;
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 23  
+
+                                          }
+                                      #endif
+                                  }
+                              }
+                          #endif
+              
+                      }
+                      else
+                      {
+                          /* The maximum didn't find */
+                          position = 0xFFFFu;
+              
+                          #if(0u != CapSense_LINEAR_SLIDERS_POS_FILTERS_MASK)
+                              /* Reset the filters */
+                              if(0u != (posFiltersMask & CapSense_ANY_POS_FILTER))
+                              {
+                                  CapSense_posFiltersData[firstTimeIndex] = 0u;
+                              }
+                          #endif
+                      }
+              
+                      
+                      return (position);
+                  }
+              #endif
+1364          
+1365          
+1366          #if(CapSense_TOTAL_RADIAL_SLIDERS_COUNT > 0u)
+                  /*******************************************************************************
+                  * Function Name: CapSense_GetRadialCentroidPos
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  Checks the CapSense_Signal[ ] array for a centroid within
+                  *  slider specified range. The centroid position is calculated to the resolution
+                  *  specified in the CapSense customizer. The position filters are applied to the
+                  *  result if enabled.
+                  *
+                  * Parameters:
+                  *  widget:  Widget number.
+                  *  For every radial slider widget there are defines in this format:
+                  *  #define CapSense_RS_"widget_name"            5
+                  * 
+                  * Return:
+                  *  Returns position value of the radial slider.
+                  *
+                  * Side Effects:
+                  *  If any sensor within the slider widget is active, the function returns values
+                  *  from zero to the API resolution value set in the CapSense customizer. If no
+                  *  sensors are active, the function returns 0xFFFF.
+                  *  There are no checks of widget type argument provided to this function.
+                  *  The unproper widget type provided will cause unexpected position calculations.
+                  *
+                  * Note:
+                  *  If noise counts on the slider segments are greater than the noise
+                  *  threshold, this subroutine may generate a false centroid result. The noise
+                  *  threshold should be set carefully (high enough above the noise level) so 
+                  *  that noise will not generate a false centroid.
+                  *
+                  *
+                  * Reentrant:
+                  *  No.
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 24  
+
+                  *
+                  *******************************************************************************/
+                   uint16 CapSense_GetRadialCentroidPos(uint8 widget)
+                  {
+                      #if (0u != CapSense_RADIAL_SLIDERS_POS_FILTERS_MASK)
+                          uint8 posIndex;
+                          uint8 firstTimeIndex = CapSense_posFiltersData[widget];
+                          uint8 posFiltersMask = CapSense_posFiltersMask[widget]; 
+              
+                      #endif
+                      #if ((0u != (CapSense_MEDIAN_FILTER & CapSense_RADIAL_SLIDERS_POS_FILTERS_MASK)) || \
+                           (0u != (CapSense_AVERAGING_FILTER & CapSense_RADIAL_SLIDERS_POS_FILTERS_MASK)))
+                          uint8 tempPos;
+                      #endif
+              
+                      uint8 maximum;
+                      uint16 position;
+                      uint8 offset = CapSense_rawDataIndex[widget];
+                      uint8 count = CapSense_numberOfSensors[widget];
+                      
+                      /* Find Maximum within centroid */        
+                      #if (CapSense_IS_DIPLEX_SLIDER)
+                          maximum = CapSense_FindMaximum(offset, count, CapSense_fingerThreshold[widget], 0u);
+                      #else
+                          maximum = CapSense_FindMaximum(offset, count, CapSense_fingerThreshold[widget]);
+                      #endif
+                      
+                      if (maximum != 0xFFu)
+                      {
+                          /* Calculate centroid */
+                          position = (uint16) CapSense_CalcCentroid(maximum, 
+                                       offset, count, CapSense_centroidMult[widget], CapSense_noiseThreshold[widget]);
+              
+                          #if (0u != CapSense_RADIAL_SLIDERS_POS_FILTERS_MASK)
+                              /* Check if this Radial slider has enabled filters */
+                              if (0u != (posFiltersMask & CapSense_ANY_POS_FILTER))
+                              {
+                                  /* Caluclate position to store filters data */
+                                  posIndex  = firstTimeIndex + 1u;
+                                  
+                                  if (0u == CapSense_posFiltersData[firstTimeIndex])
+                                  {
+                                      /* Init filters */
+                                      CapSense_posFiltersData[posIndex] = (uint8) position;
+                                      #if ((0u != (CapSense_MEDIAN_FILTER & CapSense_RADIAL_SLIDERS_POS_FILTERS_MASK)) |
+             -| \
+                                           (0u != (CapSense_AVERAGING_FILTER & CapSense_RADIAL_SLIDERS_POS_FILTERS_MASK)
+             -))
+                                          if ( (0u != (posFiltersMask & CapSense_MEDIAN_FILTER))  || 
+                                               (0u != (posFiltersMask & CapSense_AVERAGING_FILTER)) )
+                                          {
+                                              CapSense_posFiltersData[posIndex + 1u] = (uint8) position;
+                                          }
+                                      #endif
+                                      
+                                      CapSense_posFiltersData[firstTimeIndex] = 1u;
+                                  }
+                                  else
+                                  {
+                                      /* Do filtering */
+                                      #if (0u != (CapSense_MEDIAN_FILTER & CapSense_RADIAL_SLIDERS_POS_FILTERS_MASK))
+                                          if (0u != (posFiltersMask & CapSense_MEDIAN_FILTER))
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 25  
+
+                                          {
+                                              tempPos = (uint8) position;
+                                              position = CapSense_MedianFilter(position,CapSense_posFiltersData[posIndex
+             -], 
+                                                CapSense_posFiltersData[posIndex + 1u]);
+                                              CapSense_posFiltersData[posIndex + 1u] = CapSense_posFiltersData[posIndex]
+             -;
+                                              CapSense_posFiltersData[posIndex] = tempPos;
+                                          }
+                                      #endif
+              
+                                      #if (0u != (CapSense_AVERAGING_FILTER & CapSense_RADIAL_SLIDERS_POS_FILTERS_MASK))
+                                          if (0u != (posFiltersMask & CapSense_AVERAGING_FILTER))
+                                          {
+                                              tempPos = (uint8) position;
+                                              position = CapSense_AveragingFilter(position, CapSense_posFiltersData[posI
+             -ndex], 
+                                                CapSense_posFiltersData[posIndex + 1u]);
+                                              CapSense_posFiltersData[posIndex + 1u] = CapSense_posFiltersData[posIndex]
+             -;
+                                              CapSense_posFiltersData[posIndex] = tempPos;
+                                          }
+                                      #endif
+              
+                                      #if (0u != (CapSense_IIR2_FILTER & CapSense_RADIAL_SLIDERS_POS_FILTERS_MASK))
+                                          if (0u != (posFiltersMask & CapSense_IIR2_FILTER))
+                                          {
+                                              position = CapSense_IIR2Filter(position, CapSense_posFiltersData[posIndex]
+             -);
+                                              CapSense_posFiltersData[posIndex] = (uint8) position;
+                                          }
+                                      #endif
+              
+                                      #if (0u != (CapSense_IIR4_FILTER & CapSense_RADIAL_SLIDERS_POS_FILTERS_MASK))
+                                          if (0u != (posFiltersMask & CapSense_IIR4_FILTER))
+                                          {
+                                              position = CapSense_IIR4Filter(position, CapSense_posFiltersData[posIndex]
+             -);
+                                              CapSense_posFiltersData[posIndex] = (uint8) position;
+                                          }
+                                      #endif
+              
+                                      #if (0u != (CapSense_JITTER_FILTER & CapSense_RADIAL_SLIDERS_POS_FILTERS_MASK))
+                                          if (0u != (posFiltersMask & CapSense_JITTER_FILTER))
+                                          {
+                                              position = CapSense_JitterFilter(position, CapSense_posFiltersData[posInde
+             -x]);
+                                              CapSense_posFiltersData[posIndex] = (uint8) position;
+                                          }
+                                      #endif
+                                  }
+                              }
+                          #endif
+              
+                      }
+                      else
+                      {
+                          /* The maximum didn't find */
+                          position = 0xFFFFu;
+              
+                          #if (0u != CapSense_RADIAL_SLIDERS_POS_FILTERS_MASK)
+                              /* Reset the filters */
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 26  
+
+                              if((posFiltersMask & CapSense_ANY_POS_FILTER) != 0u)
+                              {
+                                  CapSense_posFiltersData[firstTimeIndex] = 0u;
+                              }
+                          #endif
+                      }
+                      
+                      return (position);
+                  }
+              #endif
+1526          
+1527          
+1528          #if(CapSense_TOTAL_TOUCH_PADS_COUNT > 0u)
+                  /*******************************************************************************
+                  * Function Name: CapSense_GetTouchCentroidPos
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  If a finger is present on touch pad, this function calculates the X and Y
+                  *  position of the finger by calculating the centroids within touch pad specified
+                  *  range. The X and Y positions are calculated to the API resolutions set in the
+                  *  CapSense customizer. Returns a 1 if a finger is on the touchpad.
+                  *  The position filter is applied to the result if enabled.
+                  *  This function is available only if a touch pad is defined by the CapSense
+                  *  customizer.
+                  *
+                  * Parameters:
+                  *  widget:  Widget number. 
+                  *  For every touchpad widget there are defines in this format:
+                  *  #define CapSense_TP_"widget_name"            5
+                  *
+                  *  pos:     Pointer to the array of two uint16 elements, where result
+                  *  result of calculation of X and Y position are stored.
+                  *  pos[0u]  - position of X
+                  *  pos[1u]  - position of Y
+                  *
+                  * Return:
+                  *  Returns a 1 if a finger is on the touch pad, 0 - if not.
+                  *
+                  * Side Effects:
+                  *   There are no checks of widget type argument provided to this function.
+                  *   The unproper widget type provided will cause unexpected position
+                  *   calculations.
+                  *
+                  * Reentrant:
+                  *  No.
+                  *
+                  *******************************************************************************/
+                  uint8 CapSense_GetTouchCentroidPos(uint8 widget, uint16* pos)
+                  {
+                      #if (0u != CapSense_TOUCH_PADS_POS_FILTERS_MASK)
+                          uint8 posXIndex;
+                          uint8 posYIndex;
+                          uint8 firstTimeIndex = CapSense_posFiltersData[widget];
+                          uint8 posFiltersMask = CapSense_posFiltersMask[widget];
+                      #endif
+                      #if ((0u != (CapSense_MEDIAN_FILTER & CapSense_TOUCH_PADS_POS_FILTERS_MASK)) || \
+                           (0u != (CapSense_AVERAGING_FILTER & CapSense_TOUCH_PADS_POS_FILTERS_MASK)))
+                          uint16 tempPos;
+                      #endif
+              
+                      uint8 MaxX;
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 27  
+
+                      uint8 MaxY;
+                      uint8 posX;
+                      uint8 posY;
+                      uint8 touch = 0u;
+                      uint8 offset = CapSense_rawDataIndex[widget];
+                      uint8 count = CapSense_numberOfSensors[widget];
+                      
+                      /* Find Maximum within X centroid */
+                      #if (CapSense_IS_DIPLEX_SLIDER)
+                          MaxX = CapSense_FindMaximum(offset, count, CapSense_fingerThreshold[widget], 0u);
+                      #else
+                          MaxX = CapSense_FindMaximum(offset, count, CapSense_fingerThreshold[widget]);
+                      #endif
+              
+                      if (MaxX != 0xFFu)
+                      {
+                          offset = CapSense_rawDataIndex[widget + 1u];
+                          count = CapSense_numberOfSensors[widget + 1u];
+              
+                          /* Find Maximum within Y centroid */
+                          #if (CapSense_IS_DIPLEX_SLIDER)
+                              MaxY = CapSense_FindMaximum(offset, count, CapSense_fingerThreshold[widget + 1u], 0u);
+                          #else
+                              MaxY = CapSense_FindMaximum(offset, count, CapSense_fingerThreshold[widget + 1u]);
+                          #endif
+              
+                          if (MaxY != 0xFFu)
+                          {
+                              /* X and Y maximums are found = true touch */
+                              touch = 1u;
+                              
+                              /* Calculate Y centroid */
+                              posY = CapSense_CalcCentroid(MaxY, offset, count, 
+                                          CapSense_centroidMult[widget + 1u], CapSense_noiseThreshold[widget + 1u]);
+                              
+                              /* Calculate X centroid */
+                              offset = CapSense_rawDataIndex[widget];
+                              count = CapSense_numberOfSensors[widget];
+                              
+                              posX = CapSense_CalcCentroid(MaxX, offset, count, 
+                                          CapSense_centroidMult[widget],CapSense_noiseThreshold[widget]);
+                  
+                              #if (0u != CapSense_TOUCH_PADS_POS_FILTERS_MASK)
+                                  /* Check if this TP has enabled filters */
+                                  if (0u != (posFiltersMask & CapSense_ANY_POS_FILTER))
+                                  {
+                                      /* Caluclate position to store filters data */
+                                      posXIndex  = firstTimeIndex + 1u;
+                                      posYIndex  = CapSense_posFiltersData[widget + 1u];
+                                      
+                                      if (0u == CapSense_posFiltersData[firstTimeIndex])
+                                      {
+                                          /* Init filters */
+                                          CapSense_posFiltersData[posXIndex] = posX;
+                                          CapSense_posFiltersData[posYIndex] = posY;
+                                          #if ((0u != (CapSense_MEDIAN_FILTER & CapSense_TOUCH_PADS_POS_FILTERS_MASK)) |
+             -| \
+                                               (0u != (CapSense_AVERAGING_FILTER & CapSense_TOUCH_PADS_POS_FILTERS_MASK)
+             -))
+                                              if ( (0u != (posFiltersMask & CapSense_MEDIAN_FILTER)) || 
+                                                   (0u != (posFiltersMask & CapSense_AVERAGING_FILTER)) )
+                                              {
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 28  
+
+                                                  CapSense_posFiltersData[posXIndex + 1u] = posX;
+                                                  CapSense_posFiltersData[posYIndex + 1u] = posY;
+                                              }
+                                          #endif
+                                          
+                                          CapSense_posFiltersData[firstTimeIndex] = 1u;
+                                      }
+                                      else
+                                      {
+                                          /* Do filtering */
+                                          #if (0u != (CapSense_MEDIAN_FILTER & CapSense_TOUCH_PADS_POS_FILTERS_MASK))
+                                              if (0u != (posFiltersMask & CapSense_MEDIAN_FILTER))
+                                              {
+                                                  tempPos = posX;
+                                                  posX = (uint8) CapSense_MedianFilter(posX, CapSense_posFiltersData[pos
+             -XIndex], 
+                                                    CapSense_posFiltersData[posXIndex + 1u]);
+                                                  CapSense_posFiltersData[posXIndex + 1u] = CapSense_posFiltersData[posX
+             -Index];
+                                                  CapSense_posFiltersData[posXIndex] = tempPos;
+                                                  
+                                                  tempPos = posY;
+                                                  posY = (uint8) CapSense_MedianFilter(posY, CapSense_posFiltersData[pos
+             -YIndex], 
+                                                    CapSense_posFiltersData[posYIndex + 1u]);
+                                                  CapSense_posFiltersData[posYIndex + 1u] = CapSense_posFiltersData[posY
+             -Index];
+                                                  CapSense_posFiltersData[posYIndex] = tempPos;
+                                              }
+                                              
+                                          #endif
+              
+                                          #if (0u != (CapSense_AVERAGING_FILTER & CapSense_TOUCH_PADS_POS_FILTERS_MASK))
+                                              if (0u != (posFiltersMask & CapSense_AVERAGING_FILTER))
+                                              {
+                                                  tempPos = posX;
+                                                  posX = (uint8) CapSense_AveragingFilter(posX, CapSense_posFiltersData[
+             -posXIndex], 
+                                                    CapSense_posFiltersData[posXIndex + 1u]);
+                                                  CapSense_posFiltersData[posXIndex + 1u] = CapSense_posFiltersData[posX
+             -Index];
+                                                  CapSense_posFiltersData[posXIndex] = tempPos;
+                                                  
+                                                  tempPos = posY;
+                                                  posY = (uint8) CapSense_AveragingFilter(posY, CapSense_posFiltersData[
+             -posYIndex], 
+                                                    CapSense_posFiltersData[posYIndex + 1u]);
+                                                  CapSense_posFiltersData[posYIndex + 1u] = CapSense_posFiltersData[posY
+             -Index];
+                                                  CapSense_posFiltersData[posYIndex] = tempPos;
+                                              }
+                                              
+                                          #endif
+              
+                                          #if (0u != (CapSense_IIR2_FILTER & CapSense_TOUCH_PADS_POS_FILTERS_MASK))
+                                              if (0u != (posFiltersMask & CapSense_IIR2_FILTER))
+                                              {
+                                                  posX = (uint8) CapSense_IIR2Filter(posX, CapSense_posFiltersData[posXI
+             -ndex]);
+                                                  CapSense_posFiltersData[posXIndex] = posX;
+                                                  
+                                                  posY = (uint8) CapSense_IIR2Filter(posY, CapSense_posFiltersData[posYI
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 29  
+
+             -ndex]);
+                                                  CapSense_posFiltersData[posYIndex] = posY;
+                                              }
+                                              
+                                          #endif
+              
+                                          #if (0u != (CapSense_IIR4_FILTER & CapSense_TOUCH_PADS_POS_FILTERS_MASK))
+                                              if (0u != (posFiltersMask & CapSense_IIR4_FILTER))
+                                              {
+                                                  posX = (uint8) CapSense_IIR4Filter(posX, CapSense_posFiltersData[posXI
+             -ndex]);
+                                                  CapSense_posFiltersData[posXIndex] = posX;
+                                                  
+                                                  posY = (uint8) CapSense_IIR4Filter(posY, CapSense_posFiltersData[posYI
+             -ndex]);
+                                                  CapSense_posFiltersData[posYIndex] = posY;
+                                              }
+                                              
+                                          #endif
+              
+                                          #if (0u != (CapSense_JITTER_FILTER & CapSense_TOUCH_PADS_POS_FILTERS_MASK))
+                                              if (0u != (posFiltersMask & CapSense_JITTER_FILTER))
+                                                  {
+                                                      posX = (uint8) CapSense_JitterFilter(posX, CapSense_posFiltersData
+             -[posXIndex]);
+                                                      CapSense_posFiltersData[posXIndex] = posX;
+                                                      
+                                                      posY = (uint8) CapSense_JitterFilter(posY, CapSense_posFiltersData
+             -[posYIndex]);
+                                                      CapSense_posFiltersData[posYIndex] = posY;
+                                                  }
+                                          #endif
+                                      }
+                                  }
+                              #endif
+              
+                              /* Save positions */
+                              pos[0u] = posX;
+                              pos[1u] = posY;
+                          }
+                      }
+              
+                      #if (0u != CapSense_TOUCH_PADS_POS_FILTERS_MASK)
+                          if(touch == 0u)
+                          {
+                              /* Reset the filters */
+                              if ((posFiltersMask & CapSense_ANY_POS_FILTER) != 0u)
+                              {
+                                  CapSense_posFiltersData[firstTimeIndex] = 0u;
+                              }
+                          }
+                      #endif
+                      
+                      return (touch);
+                  }
+              #endif
+1742          
+1743          
+1744          #if ( (CapSense_RAW_FILTER_MASK & CapSense_MEDIAN_FILTER) || \
+1745                (CapSense_POS_FILTERS_MASK & CapSense_MEDIAN_FILTER) )
+                  /*******************************************************************************
+                  * Function Name: CapSense_MedianFilter
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 30  
+
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  Median filter function. 
+                  *  The median filter looks at the three most recent samples and reports the 
+                  *  median value.
+                  *
+                  * Parameters:
+                  *  x1:  Current value.
+                  *  x2:  Previous value.
+                  *  x3:  Before previous value.
+                  *
+                  * Return:
+                  *  Returns filtered value.
+                  *
+                  *******************************************************************************/
+                  uint16 CapSense_MedianFilter(uint16 x1, uint16 x2, uint16 x3) \
+                                                       
+                  {
+                      uint16 tmp;
+                      
+                      if (x1 > x2)
+                      {
+                          tmp = x2;
+                          x2 = x1;
+                          x1 = tmp;
+                      }
+                      
+                      if (x2 > x3)
+                      {
+                          x2 = x3;
+                      }
+                      
+                      return ((x1 > x2) ? x1 : x2);
+                  }
+              #endif /* End CapSense_RAW_FILTER_MASK && CapSense_POS_FILTERS_MASK */
+1784          
+1785          
+1786          #if ( (CapSense_RAW_FILTER_MASK & CapSense_AVERAGING_FILTER) || \
+1787                (CapSense_POS_FILTERS_MASK & CapSense_AVERAGING_FILTER) )
+                  /*******************************************************************************
+                  * Function Name: CapSense_AveragingFilter
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  Averaging filter function.
+                  *  The averaging filter looks at the three most recent samples of position and
+                  *  reports the averaging value.
+                  *
+                  * Parameters:
+                  *  x1:  Current value.
+                  *  x2:  Previous value.
+                  *  x3:  Before previous value.
+                  *
+                  * Return:
+                  *  Returns filtered value.
+                  *
+                  *******************************************************************************/
+                  uint16 CapSense_AveragingFilter(uint16 x1, uint16 x2, uint16 x3) \
+                                                          
+                  {
+                      uint32 tmp = ((uint32)x1 + (uint32)x2 + (uint32)x3) / 3u;
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 31  
+
+                      
+                      return ((uint16) tmp);
+                  }
+              #endif /* End CapSense_RAW_FILTER_MASK && CapSense_POS_FILTERS_MASK */
+1814          
+1815          
+1816          #if ( (CapSense_RAW_FILTER_MASK & CapSense_IIR2_FILTER) || \
+1817                (CapSense_POS_FILTERS_MASK & CapSense_IIR2_FILTER) )
+                  /*******************************************************************************
+                  * Function Name: CapSense_IIR2Filter
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  IIR1/2 filter function. IIR1/2 = 1/2current + 1/2previous.
+                  *
+                  * Parameters:
+                  *  x1:  Current value.
+                  *  x2:  Previous value.
+                  *
+                  * Return:
+                  *  Returns filtered value.
+                  *
+                  *******************************************************************************/
+                  uint16 CapSense_IIR2Filter(uint16 x1, uint16 x2) \
+                                                     
+                  {
+                      uint32 tmp;
+                      
+                      /* IIR = 1/2 Current Value+ 1/2 Previous Value */
+                      tmp = (uint32)x1 + (uint32)x2;
+                      tmp >>= 1u;
+                  
+                      return ((uint16) tmp);
+                  }
+              #endif /* End CapSense_RAW_FILTER_MASK && CapSense_POS_FILTERS_MASK */
+1845          
+1846          
+1847          #if ( (CapSense_RAW_FILTER_MASK & CapSense_IIR4_FILTER) || \
+1848                (CapSense_POS_FILTERS_MASK & CapSense_IIR4_FILTER) )
+                  /*******************************************************************************
+                  * Function Name: CapSense_IIR4Filter
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  IIR1/4 filter function. IIR1/4 = 1/4current + 3/4previous.
+                  *
+                  * Parameters:
+                  *  x1:  Current value.
+                  *  x2:  Previous value.
+                  *
+                  * Return:
+                  *  Returns filtered value.
+                  *
+                  *******************************************************************************/
+                  uint16 CapSense_IIR4Filter(uint16 x1, uint16 x2) \
+                                                     
+                  {
+                      uint32 tmp;
+                      
+                      /* IIR = 1/4 Current Value + 3/4 Previous Value */
+                      tmp = (uint32)x1 + (uint32)x2;
+                      tmp += ((uint32)x2 << 1u);
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 32  
+
+                      tmp >>= 2u;
+                      
+                      return ((uint16) tmp);
+                  }
+              #endif /* End CapSense_RAW_FILTER_MASK && CapSense_POS_FILTERS_MASK */
+1877          
+1878          
+1879          #if ( (CapSense_RAW_FILTER_MASK & CapSense_JITTER_FILTER) || \
+1880                (CapSense_POS_FILTERS_MASK & CapSense_JITTER_FILTER) )
+                  /*******************************************************************************
+                  * Function Name: uint16 CapSense_JitterFilter
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  Jitter filter function.
+                  *
+                  * Parameters:
+                  *  x1:  Current value.
+                  *  x2:  Previous value.
+                  *
+                  * Return:
+                  *  Returns filtered value.
+                  *
+                  *******************************************************************************/
+                  uint16 CapSense_JitterFilter(uint16 x1, uint16 x2) \
+                                                       
+                  {
+                      if (x1 > x2)
+                      {
+                          x1--;
+                      }
+                      else
+                      {
+                          if (x1 < x2)
+                          {
+                              x1++;
+                          }
+                      }
+                  
+                      return x1;
+                  }
+              #endif /* End CapSense_RAW_FILTER_MASK && CapSense_POS_FILTERS_MASK */
+1914          
+1915          
+1916          #if (CapSense_RAW_FILTER_MASK & CapSense_IIR8_FILTER)
+                  /*******************************************************************************
+                  * Function Name: CapSense_IIR8Filter
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  IIR1/8 filter function. IIR1/8 = 1/8current + 7/8previous.
+                  *  Only applies for raw data.
+                  *
+                  * Parameters:
+                  *  x1:  Current value.
+                  *  x2:  Previous value.
+                  *
+                  * Return:
+                  *  Returns filtered value.
+                  *
+                  *******************************************************************************/
+                  uint16 CapSense_IIR8Filter(uint16 x1, uint16 x2) \
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 33  
+
+                                                     
+                  {
+                      uint32 tmp;
+                      
+                      /* IIR = 1/8 Current Value + 7/8 Previous Value */
+                      tmp = (uint32)x1;
+                      tmp += (((uint32)x2 << 3u) - ((uint32)x2));
+                      tmp >>= 3u;
+                  
+                      return ((uint16) tmp);
+                  }
+              #endif /* End (CapSense_RAW_FILTER_MASK & CapSense_IIR8_FILTER) */
+1946          
+1947          
+1948          #if (CapSense_RAW_FILTER_MASK & CapSense_IIR16_FILTER)
+                  /*******************************************************************************
+                  * Function Name: CapSense_IIR16Filter
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  IIR1/16 filter function. IIR1/16 = 1/16current + 15/16previous.
+                  *  Only applies for raw data.
+                  *
+                  * Parameters:
+                  *  x1:  Current value.
+                  *  x2:  Previous value.
+                  *
+                  * Return:
+                  *  Returns filtered value.
+                  *
+                  *******************************************************************************/
+                  uint16 CapSense_IIR16Filter(uint16 x1, uint16 x2) \
+                                                      
+                  {
+                      uint32 tmp;
+                      
+                      /* IIR = 1/16 Current Value + 15/16 Previous Value */
+                      tmp = (uint32)x1;
+                      tmp += (((uint32)x2 << 4u) - ((uint32)x2));
+                      tmp >>= 4u;
+                      
+                      return ((uint16) tmp);
+                  }
+              #endif /* End (CapSense_RAW_FILTER_MASK & CapSense_IIR16_FILTER) */
+1978          
+1979          
+1980          #if (CapSense_TOTAL_MATRIX_BUTTONS_COUNT)
+              
+                  /*******************************************************************************
+                  * Function Name: CapSense_GetMatrixButtonPos
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  Function calculates and returns touch position (column and row) for matrix
+                  *  button widget.
+                  *
+                  * Parameters:
+                  *  widget:  widget number;
+                  *  pos:     pointer to an array of two uint8, where touch postion will be 
+                  *           stored:
+                  *           pos[0] - column position;
+                  *           pos[1] - raw position.
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 34  
+
+                  *
+                  * Return:
+                  *  Returns 1 if row and column sensors of matrix button are active, 0 - in other
+                  *  cases.
+                  *
+                  * Reentrant:
+                  *  No
+                  *
+                  *******************************************************************************/
+                  uint8 CapSense_GetMatrixButtonPos(uint8 widget, uint8* pos)
+                  {
+                      uint8 i;
+                      uint16 row_sig_max = 0u;
+                      uint16 col_sig_max = 0u;
+                      uint8 row_ind = 0u;
+                      uint8 col_ind = 0u;
+              
+                      if (CapSense_CheckIsWidgetActive(widget))
+                      {
+                          /* Find row number with maximal signal value */
+                          for(i = CapSense_rawDataIndex[widget]; i < CapSense_rawDataIndex[widget] + \
+                               CapSense_numberOfSensors[widget]; i++) 
+                          {          
+                              if (CapSense_SensorSignal[i] > col_sig_max)
+                              {
+                                  col_ind = i;
+                                  col_sig_max = CapSense_SensorSignal[i];
+                              }
+                          }
+              
+                          /* Find row number with maximal signal value */
+                          for(i = CapSense_rawDataIndex[widget+1u]; i < CapSense_rawDataIndex[widget+1u] + \
+                               CapSense_numberOfSensors[widget+1u]; i++) 
+                          {          
+                              if (CapSense_SensorSignal[i] > row_sig_max)
+                              {
+                                  row_ind = i;
+                                  row_sig_max = CapSense_SensorSignal[i];
+                              }
+                          }
+              
+                          if(col_sig_max >= CapSense_fingerThreshold[widget] && \
+                             row_sig_max >= CapSense_fingerThreshold[widget+1u])
+                          {
+                              pos[0u] = col_ind - CapSense_rawDataIndex[widget];
+                              pos[1u] = row_ind - CapSense_rawDataIndex[widget+1u];
+                              return 1u;
+                          }
+                      }
+                      return 0u;
+                  }
+              
+              #endif /* End (CapSense_TOTAL_MATRIX_BUTTONS_COUNT) */
+2049          
+2050          /* [] END OF FILE */
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 35  
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION _CapSense_BaseInit (BEGIN)
+                                           ; SOURCE LINE # 176
+0000 900000      R     MOV     DPTR,#sensor
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 177
+                                           ; SOURCE LINE # 180
+0005 900000      R     MOV     DPTR,#sensor
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A EF                MOV     A,R7
+000B 900000      E     MOV     DPTR,#CapSense_widgetNumber
+000E 93                MOVC    A,@A+DPTR
+000F FF                MOV     R7,A
+0010 900000      R     MOV     DPTR,#widget
+0013 EF                MOV     A,R7
+0014 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 194
+0015 900000      R     MOV     DPTR,#sensor
+0018 E0                MOVX    A,@DPTR
+0019 FF                MOV     R7,A
+001A EF                MOV     A,R7
+001B 25E0              ADD     A,ACC
+001D 2400        E     ADD     A,#LOW CapSense_SensorRaw
+001F F582              MOV     DPL,A
+0021 E4                CLR     A
+0022 3400        E     ADDC    A,#HIGH CapSense_SensorRaw
+0024 F583              MOV     DPH,A
+0026 E0                MOVX    A,@DPTR
+0027 FE                MOV     R6,A
+0028 A3                INC     DPTR
+0029 E0                MOVX    A,@DPTR
+002A FF                MOV     R7,A
+002B 900000      R     MOV     DPTR,#sensor
+002E E0                MOVX    A,@DPTR
+002F FD                MOV     R5,A
+0030 ED                MOV     A,R5
+0031 25E0              ADD     A,ACC
+0033 2400        R     ADD     A,#LOW CapSense_SensorBaseline
+0035 F582              MOV     DPL,A
+0037 E4                CLR     A
+0038 3400        R     ADDC    A,#HIGH CapSense_SensorBaseline
+003A F583              MOV     DPH,A
+003C EE                MOV     A,R6
+003D F0                MOVX    @DPTR,A
+003E A3                INC     DPTR
+003F EF                MOV     A,R7
+0040 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 195
+0041 900000      R     MOV     DPTR,#sensor
+0044 E0                MOVX    A,@DPTR
+0045 FF                MOV     R7,A
+0046 7400        R     MOV     A,#LOW CapSense_SensorBaselineLow
+0048 2F                ADD     A,R7
+0049 F582              MOV     DPL,A
+004B E4                CLR     A
+004C 3400        R     ADDC    A,#HIGH CapSense_SensorBaselineLow
+004E F583              MOV     DPH,A
+0050 E4                CLR     A
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 36  
+
+0051 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 196
+0052 900000      R     MOV     DPTR,#sensor
+0055 E0                MOVX    A,@DPTR
+0056 FF                MOV     R7,A
+0057 7400        R     MOV     A,#LOW CapSense_SensorSignal
+0059 2F                ADD     A,R7
+005A F582              MOV     DPL,A
+005C E4                CLR     A
+005D 3400        R     ADDC    A,#HIGH CapSense_SensorSignal
+005F F583              MOV     DPH,A
+0061 E4                CLR     A
+0062 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 198
+0063 900000      R     MOV     DPTR,#widget
+0066 E0                MOVX    A,@DPTR
+0067 FF                MOV     R7,A
+0068 7400        R     MOV     A,#LOW CapSense_debounce
+006A 2F                ADD     A,R7
+006B F582              MOV     DPL,A
+006D E4                CLR     A
+006E 3400        R     ADDC    A,#HIGH CapSense_debounce
+0070 F583              MOV     DPH,A
+0072 E0                MOVX    A,@DPTR
+0073 FF                MOV     R7,A
+0074 900000      R     MOV     DPTR,#widget
+0077 E0                MOVX    A,@DPTR
+0078 FE                MOV     R6,A
+0079 7400        R     MOV     A,#LOW CapSense_debounceCounter
+007B 2E                ADD     A,R6
+007C F582              MOV     DPL,A
+007E E4                CLR     A
+007F 3400        R     ADDC    A,#HIGH CapSense_debounceCounter
+0081 F583              MOV     DPH,A
+0083 EF                MOV     A,R7
+0084 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 223
+0085 22                RET     
+             ; FUNCTION _CapSense_BaseInit (END)
+
+             ; FUNCTION _CapSense_InitializeSensorBaseline (BEGIN)
+                                           ; SOURCE LINE # 247
+0000 900000      R     MOV     DPTR,#sensor
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 248
+                                           ; SOURCE LINE # 250
+0005 900000      R     MOV     DPTR,#sensor
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A 120000      E     LCALL   _CapSense_ScanSensor
+000D         ?C0002:
+                                           ; SOURCE LINE # 251
+000D 120000      E     LCALL   CapSense_IsBusy
+0010 EF                MOV     A,R7
+0011 70FA              JNZ     ?C0002
+0013         ?C0003:
+                                           ; SOURCE LINE # 255
+0013 900000      R     MOV     DPTR,#sensor
+0016 E0                MOVX    A,@DPTR
+0017 FF                MOV     R7,A
+0018 120000      R     LCALL   _CapSense_BaseInit
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 37  
+
+                                           ; SOURCE LINE # 272
+001B 22                RET     
+             ; FUNCTION _CapSense_InitializeSensorBaseline (END)
+
+             ; FUNCTION CapSense_InitializeAllBaselines (BEGIN)
+                                           ; SOURCE LINE # 295
+                                           ; SOURCE LINE # 296
+                                           ; SOURCE LINE # 300
+0000 900000      R     MOV     DPTR,#i
+0003 E4                CLR     A
+0004 F0                MOVX    @DPTR,A
+0005         ?C0005:
+0005 900000      R     MOV     DPTR,#i
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A EF                MOV     A,R7
+000B C3                CLR     C
+000C 9402              SUBB    A,#02H
+000E 5010              JNC     ?C0008
+                                           ; SOURCE LINE # 301
+                                           ; SOURCE LINE # 302
+0010 900000      R     MOV     DPTR,#i
+0013 E0                MOVX    A,@DPTR
+0014 FF                MOV     R7,A
+0015 120000      R     LCALL   _CapSense_InitializeSensorBaseline
+                                           ; SOURCE LINE # 303
+0018 900000      R     MOV     DPTR,#i
+001B E0                MOVX    A,@DPTR
+001C 04                INC     A
+001D F0                MOVX    @DPTR,A
+001E 80E5              SJMP    ?C0005
+                                           ; SOURCE LINE # 304
+0020         ?C0008:
+0020 22                RET     
+             ; FUNCTION CapSense_InitializeAllBaselines (END)
+
+             ; FUNCTION CapSense_InitializeEnabledBaselines (BEGIN)
+                                           ; SOURCE LINE # 327
+                                           ; SOURCE LINE # 328
+                                           ; SOURCE LINE # 333
+0000 120000      E     LCALL   CapSense_ScanEnabledWidgets
+0003         ?C0009:
+                                           ; SOURCE LINE # 334
+0003 120000      E     LCALL   CapSense_IsBusy
+0006 EF                MOV     A,R7
+0007 70FA              JNZ     ?C0009
+0009         ?C0010:
+                                           ; SOURCE LINE # 336
+0009 900000      R     MOV     DPTR,#i
+000C E4                CLR     A
+000D F0                MOVX    @DPTR,A
+000E         ?C0011:
+000E 900000      R     MOV     DPTR,#i
+0011 E0                MOVX    A,@DPTR
+0012 FF                MOV     R7,A
+0013 EF                MOV     A,R7
+0014 C3                CLR     C
+0015 9402              SUBB    A,#02H
+0017 506D              JNC     ?C0015
+                                           ; SOURCE LINE # 337
+                                           ; SOURCE LINE # 338
+0019 900000      R     MOV     DPTR,#i
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 38  
+
+001C E0                MOVX    A,@DPTR
+001D FF                MOV     R7,A
+001E EF                MOV     A,R7
+001F 13                RRC     A
+0020 13                RRC     A
+0021 13                RRC     A
+0022 541F              ANL     A,#01FH
+0024 FF                MOV     R7,A
+0025 900000      R     MOV     DPTR,#pos
+0028 EF                MOV     A,R7
+0029 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 339
+002A 900000      R     MOV     DPTR,#i
+002D E0                MOVX    A,@DPTR
+002E FF                MOV     R7,A
+002F EF                MOV     A,R7
+0030 5407              ANL     A,#07H
+0032 FF                MOV     R7,A
+0033 7401              MOV     A,#01H
+0035 A807              MOV     R0,AR7
+0037 08                INC     R0
+0038 8002              SJMP    ?C0062
+003A         ?C0061:
+003A C3                CLR     C
+003B 33                RLC     A
+003C         ?C0062:
+003C D8FC              DJNZ    R0,?C0061
+003E FF                MOV     R7,A
+003F 900000      R     MOV     DPTR,#enMask
+0042 EF                MOV     A,R7
+0043 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 342
+0044 900000      R     MOV     DPTR,#pos
+0047 E0                MOVX    A,@DPTR
+0048 FF                MOV     R7,A
+0049 7400        E     MOV     A,#LOW CapSense_SensorEnableMask
+004B 2F                ADD     A,R7
+004C F582              MOV     DPL,A
+004E E4                CLR     A
+004F 3400        E     ADDC    A,#HIGH CapSense_SensorEnableMask
+0051 F583              MOV     DPH,A
+0053 E0                MOVX    A,@DPTR
+0054 FF                MOV     R7,A
+0055 900000      R     MOV     DPTR,#enMask
+0058 E0                MOVX    A,@DPTR
+0059 FE                MOV     R6,A
+005A EF                MOV     A,R7
+005B 5E                ANL     A,R6
+005C FF                MOV     R7,A
+005D EF                MOV     A,R7
+005E 7016              JNZ     ?C0014
+                                           ; SOURCE LINE # 343
+                                           ; SOURCE LINE # 344
+0060 900000      R     MOV     DPTR,#i
+0063 E0                MOVX    A,@DPTR
+0064 FF                MOV     R7,A
+0065 EF                MOV     A,R7
+0066 25E0              ADD     A,ACC
+0068 2400        E     ADD     A,#LOW CapSense_SensorRaw
+006A F582              MOV     DPL,A
+006C E4                CLR     A
+006D 3400        E     ADDC    A,#HIGH CapSense_SensorRaw
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 39  
+
+006F F583              MOV     DPH,A
+0071 E4                CLR     A
+0072 F0                MOVX    @DPTR,A
+0073 A3                INC     DPTR
+0074 E4                CLR     A
+0075 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 345
+0076         ?C0014:
+                                           ; SOURCE LINE # 348
+0076 900000      R     MOV     DPTR,#i
+0079 E0                MOVX    A,@DPTR
+007A FF                MOV     R7,A
+007B 120000      R     LCALL   _CapSense_BaseInit
+                                           ; SOURCE LINE # 349
+007E 900000      R     MOV     DPTR,#i
+0081 E0                MOVX    A,@DPTR
+0082 04                INC     A
+0083 F0                MOVX    @DPTR,A
+0084 8088              SJMP    ?C0011
+                                           ; SOURCE LINE # 350
+0086         ?C0015:
+0086 22                RET     
+             ; FUNCTION CapSense_InitializeEnabledBaselines (END)
+
+             ; FUNCTION _CapSense_UpdateSensorBaseline (BEGIN)
+                                           ; SOURCE LINE # 390
+0000 900000      R     MOV     DPTR,#sensor
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 391
+                                           ; SOURCE LINE # 395
+0005 900000      R     MOV     DPTR,#sensor
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A EF                MOV     A,R7
+000B 900000      E     MOV     DPTR,#CapSense_widgetNumber
+000E 93                MOVC    A,@A+DPTR
+000F FF                MOV     R7,A
+0010 900000      R     MOV     DPTR,#widget
+0013 EF                MOV     A,R7
+0014 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 396
+0015 900000      R     MOV     DPTR,#widget
+0018 E0                MOVX    A,@DPTR
+0019 FF                MOV     R7,A
+001A 7400        R     MOV     A,#LOW CapSense_noiseThreshold
+001C 2F                ADD     A,R7
+001D F582              MOV     DPL,A
+001F E4                CLR     A
+0020 3400        R     ADDC    A,#HIGH CapSense_noiseThreshold
+0022 F583              MOV     DPH,A
+0024 E0                MOVX    A,@DPTR
+0025 FF                MOV     R7,A
+0026 900000      R     MOV     DPTR,#noiseThreshold
+0029 EF                MOV     A,R7
+002A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 404
+002B 900000      R     MOV     DPTR,#sensor
+002E E0                MOVX    A,@DPTR
+002F FF                MOV     R7,A
+0030 EF                MOV     A,R7
+0031 25E0              ADD     A,ACC
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 40  
+
+0033 2400        E     ADD     A,#LOW CapSense_SensorRaw
+0035 F582              MOV     DPL,A
+0037 E4                CLR     A
+0038 3400        E     ADDC    A,#HIGH CapSense_SensorRaw
+003A F583              MOV     DPH,A
+003C E0                MOVX    A,@DPTR
+003D FE                MOV     R6,A
+003E A3                INC     DPTR
+003F E0                MOVX    A,@DPTR
+0040 FF                MOV     R7,A
+0041 900000      R     MOV     DPTR,#filteredRawData
+0044 EE                MOV     A,R6
+0045 F0                MOVX    @DPTR,A
+0046 A3                INC     DPTR
+0047 EF                MOV     A,R7
+0048 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 445
+0049 900000      R     MOV     DPTR,#sensor
+004C E0                MOVX    A,@DPTR
+004D FF                MOV     R7,A
+004E 120000      E     LCALL   _CapSense_CalculateThresholds
+                                           ; SOURCE LINE # 451
+0051 900000      R     MOV     DPTR,#sensor
+0054 E0                MOVX    A,@DPTR
+0055 FF                MOV     R7,A
+0056 EF                MOV     A,R7
+0057 25E0              ADD     A,ACC
+0059 2400        R     ADD     A,#LOW CapSense_SensorBaseline
+005B F582              MOV     DPL,A
+005D E4                CLR     A
+005E 3400        R     ADDC    A,#HIGH CapSense_SensorBaseline
+0060 F583              MOV     DPH,A
+0062 E0                MOVX    A,@DPTR
+0063 FE                MOV     R6,A
+0064 A3                INC     DPTR
+0065 E0                MOVX    A,@DPTR
+0066 FF                MOV     R7,A
+0067 900000      R     MOV     DPTR,#filteredRawData
+006A E0                MOVX    A,@DPTR
+006B FC                MOV     R4,A
+006C A3                INC     DPTR
+006D E0                MOVX    A,@DPTR
+006E FD                MOV     R5,A
+006F C3                CLR     C
+0070 ED                MOV     A,R5
+0071 9F                SUBB    A,R7
+0072 EC                MOV     A,R4
+0073 9E                SUBB    A,R6
+0074 4035              JC      ?C0016
+                                           ; SOURCE LINE # 452
+                                           ; SOURCE LINE # 453
+0076 900000      R     MOV     DPTR,#sensor
+0079 E0                MOVX    A,@DPTR
+007A FF                MOV     R7,A
+007B EF                MOV     A,R7
+007C 25E0              ADD     A,ACC
+007E 2400        R     ADD     A,#LOW CapSense_SensorBaseline
+0080 F582              MOV     DPL,A
+0082 E4                CLR     A
+0083 3400        R     ADDC    A,#HIGH CapSense_SensorBaseline
+0085 F583              MOV     DPH,A
+0087 E0                MOVX    A,@DPTR
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 41  
+
+0088 FE                MOV     R6,A
+0089 A3                INC     DPTR
+008A E0                MOVX    A,@DPTR
+008B FF                MOV     R7,A
+008C 900000      R     MOV     DPTR,#filteredRawData
+008F E0                MOVX    A,@DPTR
+0090 FC                MOV     R4,A
+0091 A3                INC     DPTR
+0092 E0                MOVX    A,@DPTR
+0093 FD                MOV     R5,A
+0094 C3                CLR     C
+0095 ED                MOV     A,R5
+0096 9F                SUBB    A,R7
+0097 FF                MOV     R7,A
+0098 EC                MOV     A,R4
+0099 9E                SUBB    A,R6
+009A FE                MOV     R6,A
+009B 900000      R     MOV     DPTR,#tempRaw
+009E EE                MOV     A,R6
+009F F0                MOVX    @DPTR,A
+00A0 A3                INC     DPTR
+00A1 EF                MOV     A,R7
+00A2 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 454
+00A3 900000      R     MOV     DPTR,#widget
+00A6 7401              MOV     A,#01H
+00A8 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 455
+00A9 8032              SJMP    ?C0017
+00AB         ?C0016:
+                                           ; SOURCE LINE # 457
+                                           ; SOURCE LINE # 458
+00AB 900000      R     MOV     DPTR,#sensor
+00AE E0                MOVX    A,@DPTR
+00AF FF                MOV     R7,A
+00B0 EF                MOV     A,R7
+00B1 25E0              ADD     A,ACC
+00B3 2400        R     ADD     A,#LOW CapSense_SensorBaseline
+00B5 F582              MOV     DPL,A
+00B7 E4                CLR     A
+00B8 3400        R     ADDC    A,#HIGH CapSense_SensorBaseline
+00BA F583              MOV     DPH,A
+00BC E0                MOVX    A,@DPTR
+00BD FE                MOV     R6,A
+00BE A3                INC     DPTR
+00BF E0                MOVX    A,@DPTR
+00C0 FF                MOV     R7,A
+00C1 900000      R     MOV     DPTR,#filteredRawData
+00C4 E0                MOVX    A,@DPTR
+00C5 FC                MOV     R4,A
+00C6 A3                INC     DPTR
+00C7 E0                MOVX    A,@DPTR
+00C8 FD                MOV     R5,A
+00C9 C3                CLR     C
+00CA EF                MOV     A,R7
+00CB 9D                SUBB    A,R5
+00CC FF                MOV     R7,A
+00CD EE                MOV     A,R6
+00CE 9C                SUBB    A,R4
+00CF FE                MOV     R6,A
+00D0 900000      R     MOV     DPTR,#tempRaw
+00D3 EE                MOV     A,R6
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 42  
+
+00D4 F0                MOVX    @DPTR,A
+00D5 A3                INC     DPTR
+00D6 EF                MOV     A,R7
+00D7 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 459
+00D8 900000      R     MOV     DPTR,#widget
+00DB E4                CLR     A
+00DC F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 460
+00DD         ?C0017:
+                                           ; SOURCE LINE # 462
+00DD 900000      R     MOV     DPTR,#widget
+00E0 E0                MOVX    A,@DPTR
+00E1 FF                MOV     R7,A
+00E2 EF                MOV     A,R7
+00E3 7059              JNZ     ?C0018
+00E5 900000      R     MOV     DPTR,#tempRaw
+00E8 E0                MOVX    A,@DPTR
+00E9 FE                MOV     R6,A
+00EA A3                INC     DPTR
+00EB E0                MOVX    A,@DPTR
+00EC FF                MOV     R7,A
+00ED D3                SETB    C
+00EE EF                MOV     A,R7
+00EF 9414              SUBB    A,#014H
+00F1 EE                MOV     A,R6
+00F2 9400              SUBB    A,#00H
+00F4 4048              JC      ?C0018
+                                           ; SOURCE LINE # 463
+                                           ; SOURCE LINE # 464
+00F6 900000      R     MOV     DPTR,#sensor
+00F9 E0                MOVX    A,@DPTR
+00FA FF                MOV     R7,A
+00FB 7400        R     MOV     A,#LOW CapSense_LowBaselineResetCnt
+00FD 2F                ADD     A,R7
+00FE F582              MOV     DPL,A
+0100 E4                CLR     A
+0101 3400        R     ADDC    A,#HIGH CapSense_LowBaselineResetCnt
+0103 F583              MOV     DPH,A
+0105 E0                MOVX    A,@DPTR
+0106 FF                MOV     R7,A
+0107 EF                MOV     A,R7
+0108 C3                CLR     C
+0109 9405              SUBB    A,#05H
+010B 401C              JC      ?C0019
+                                           ; SOURCE LINE # 465
+                                           ; SOURCE LINE # 466
+010D 900000      R     MOV     DPTR,#sensor
+0110 E0                MOVX    A,@DPTR
+0111 FF                MOV     R7,A
+0112 120000      R     LCALL   _CapSense_BaseInit
+                                           ; SOURCE LINE # 467
+0115 900000      R     MOV     DPTR,#sensor
+0118 E0                MOVX    A,@DPTR
+0119 FF                MOV     R7,A
+011A 7400        R     MOV     A,#LOW CapSense_LowBaselineResetCnt
+011C 2F                ADD     A,R7
+011D F582              MOV     DPL,A
+011F E4                CLR     A
+0120 3400        R     ADDC    A,#HIGH CapSense_LowBaselineResetCnt
+0122 F583              MOV     DPH,A
+0124 E4                CLR     A
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 43  
+
+0125 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 468
+0126 020000      R     LJMP    ?C0021
+0129         ?C0019:
+                                           ; SOURCE LINE # 470
+                                           ; SOURCE LINE # 471
+0129 900000      R     MOV     DPTR,#sensor
+012C E0                MOVX    A,@DPTR
+012D FF                MOV     R7,A
+012E 7400        R     MOV     A,#LOW CapSense_LowBaselineResetCnt
+0130 2F                ADD     A,R7
+0131 F582              MOV     DPL,A
+0133 E4                CLR     A
+0134 3400        R     ADDC    A,#HIGH CapSense_LowBaselineResetCnt
+0136 F583              MOV     DPH,A
+0138 E0                MOVX    A,@DPTR
+0139 04                INC     A
+013A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 472
+                                           ; SOURCE LINE # 473
+013B 020000      R     LJMP    ?C0021
+013E         ?C0018:
+                                           ; SOURCE LINE # 475
+                                           ; SOURCE LINE # 479
+013E 900000      R     MOV     DPTR,#noiseThreshold
+0141 E0                MOVX    A,@DPTR
+0142 FF                MOV     R7,A
+0143 7E00              MOV     R6,#00H
+0145 900000      R     MOV     DPTR,#tempRaw
+0148 E0                MOVX    A,@DPTR
+0149 FC                MOV     R4,A
+014A A3                INC     DPTR
+014B E0                MOVX    A,@DPTR
+014C FD                MOV     R5,A
+014D D3                SETB    C
+014E ED                MOV     A,R5
+014F 9F                SUBB    A,R7
+0150 EC                MOV     A,R4
+0151 9E                SUBB    A,R6
+0152 401F              JC      ?C0023
+0154 900000      R     MOV     DPTR,#tempRaw
+0157 E0                MOVX    A,@DPTR
+0158 FE                MOV     R6,A
+0159 A3                INC     DPTR
+015A E0                MOVX    A,@DPTR
+015B FF                MOV     R7,A
+015C C3                CLR     C
+015D EF                MOV     A,R7
+015E 9414              SUBB    A,#014H
+0160 EE                MOV     A,R6
+0161 9400              SUBB    A,#00H
+0163 4003              JC      $ + 5H
+0165 020000      R     LJMP    ?C0021
+0168 900000      R     MOV     DPTR,#widget
+016B E0                MOVX    A,@DPTR
+016C FF                MOV     R7,A
+016D EF                MOV     A,R7
+016E 6003              JZ      $ + 5H
+0170 020000      R     LJMP    ?C0021
+0173         ?C0023:
+                                           ; SOURCE LINE # 481
+                                           ; SOURCE LINE # 484
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 44  
+
+0173 900000      R     MOV     DPTR,#sensor
+0176 E0                MOVX    A,@DPTR
+0177 FF                MOV     R7,A
+0178 EF                MOV     A,R7
+0179 25E0              ADD     A,ACC
+017B 2400        R     ADD     A,#LOW CapSense_SensorBaseline
+017D F582              MOV     DPL,A
+017F E4                CLR     A
+0180 3400        R     ADDC    A,#HIGH CapSense_SensorBaseline
+0182 F583              MOV     DPH,A
+0184 E0                MOVX    A,@DPTR
+0185 FE                MOV     R6,A
+0186 A3                INC     DPTR
+0187 E0                MOVX    A,@DPTR
+0188 FF                MOV     R7,A
+0189 E4                CLR     A
+018A FC                MOV     R4,A
+018B FD                MOV     R5,A
+018C 7808              MOV     R0,#08H
+018E 120000      E     LCALL   ?C?LSHL
+0191 900000      R     MOV     DPTR,#calc
+0194 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 485
+0197 900000      R     MOV     DPTR,#calc
+019A 120000      E     LCALL   ?C?LLDXDATA0
+019D 900000      R     MOV     DPTR,#sensor
+01A0 E0                MOVX    A,@DPTR
+01A1 FF                MOV     R7,A
+01A2 7400        R     MOV     A,#LOW CapSense_SensorBaselineLow
+01A4 2F                ADD     A,R7
+01A5 F582              MOV     DPL,A
+01A7 E4                CLR     A
+01A8 3400        R     ADDC    A,#HIGH CapSense_SensorBaselineLow
+01AA F583              MOV     DPH,A
+01AC E0                MOVX    A,@DPTR
+01AD FF                MOV     R7,A
+01AE E4                CLR     A
+01AF FC                MOV     R4,A
+01B0 FD                MOV     R5,A
+01B1 FE                MOV     R6,A
+01B2 120000      E     LCALL   ?C?LOR
+01B5 900000      R     MOV     DPTR,#calc
+01B8 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 488
+01BB 900000      R     MOV     DPTR,#calc
+01BE 120000      E     LCALL   ?C?LLDXDATA0
+01C1 900000      R     MOV     DPTR,#filteredRawData
+01C4 E0                MOVX    A,@DPTR
+01C5 FE                MOV     R6,A
+01C6 A3                INC     DPTR
+01C7 E0                MOVX    A,@DPTR
+01C8 FF                MOV     R7,A
+01C9 E4                CLR     A
+01CA FC                MOV     R4,A
+01CB FD                MOV     R5,A
+01CC 120000      E     LCALL   ?C?LADD
+01CF 900000      R     MOV     DPTR,#calc
+01D2 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 491
+01D5 900000      R     MOV     DPTR,#calc
+01D8 120000      E     LCALL   ?C?LLDXDATA
+01DB C004              PUSH    AR4
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 45  
+
+01DD C005              PUSH    AR5
+01DF C006              PUSH    AR6
+01E1 C007              PUSH    AR7
+01E3 900000      R     MOV     DPTR,#sensor
+01E6 E0                MOVX    A,@DPTR
+01E7 FF                MOV     R7,A
+01E8 EF                MOV     A,R7
+01E9 25E0              ADD     A,ACC
+01EB 2400        R     ADD     A,#LOW CapSense_SensorBaseline
+01ED F582              MOV     DPL,A
+01EF E4                CLR     A
+01F0 3400        R     ADDC    A,#HIGH CapSense_SensorBaseline
+01F2 F583              MOV     DPH,A
+01F4 E0                MOVX    A,@DPTR
+01F5 FE                MOV     R6,A
+01F6 A3                INC     DPTR
+01F7 E0                MOVX    A,@DPTR
+01F8 FF                MOV     R7,A
+01F9 AB07              MOV     R3,AR7
+01FB AA06              MOV     R2,AR6
+01FD E4                CLR     A
+01FE F9                MOV     R1,A
+01FF F8                MOV     R0,A
+0200 D007              POP     AR7
+0202 D006              POP     AR6
+0204 D005              POP     AR5
+0206 D004              POP     AR4
+0208 120000      E     LCALL   ?C?LSUB
+020B 900000      R     MOV     DPTR,#calc
+020E 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 494
+0211 900000      R     MOV     DPTR,#calc
+0214 120000      E     LCALL   ?C?LLDXDATA
+0217 7808              MOV     R0,#08H
+0219 120000      E     LCALL   ?C?ULSHR
+021C 900000      R     MOV     DPTR,#sensor
+021F E0                MOVX    A,@DPTR
+0220 FD                MOV     R5,A
+0221 ED                MOV     A,R5
+0222 25E0              ADD     A,ACC
+0224 2400        R     ADD     A,#LOW CapSense_SensorBaseline
+0226 F582              MOV     DPL,A
+0228 E4                CLR     A
+0229 3400        R     ADDC    A,#HIGH CapSense_SensorBaseline
+022B F583              MOV     DPH,A
+022D EE                MOV     A,R6
+022E F0                MOVX    @DPTR,A
+022F A3                INC     DPTR
+0230 EF                MOV     A,R7
+0231 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 495
+0232 900000      R     MOV     DPTR,#calc
+0235 120000      E     LCALL   ?C?LLDXDATA
+0238 900000      R     MOV     DPTR,#sensor
+023B E0                MOVX    A,@DPTR
+023C FE                MOV     R6,A
+023D 7400        R     MOV     A,#LOW CapSense_SensorBaselineLow
+023F 2E                ADD     A,R6
+0240 F582              MOV     DPL,A
+0242 E4                CLR     A
+0243 3400        R     ADDC    A,#HIGH CapSense_SensorBaselineLow
+0245 F583              MOV     DPH,A
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 46  
+
+0247 EF                MOV     A,R7
+0248 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 497
+0249 900000      R     MOV     DPTR,#sensor
+024C E0                MOVX    A,@DPTR
+024D FF                MOV     R7,A
+024E 7400        R     MOV     A,#LOW CapSense_LowBaselineResetCnt
+0250 2F                ADD     A,R7
+0251 F582              MOV     DPL,A
+0253 E4                CLR     A
+0254 3400        R     ADDC    A,#HIGH CapSense_LowBaselineResetCnt
+0256 F583              MOV     DPH,A
+0258 E4                CLR     A
+0259 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 499
+                                           ; SOURCE LINE # 501
+025A         ?C0021:
+                                           ; SOURCE LINE # 504
+025A 900000      R     MOV     DPTR,#noiseThreshold
+025D E0                MOVX    A,@DPTR
+025E FF                MOV     R7,A
+025F 7E00              MOV     R6,#00H
+0261 900000      R     MOV     DPTR,#tempRaw
+0264 E0                MOVX    A,@DPTR
+0265 FC                MOV     R4,A
+0266 A3                INC     DPTR
+0267 E0                MOVX    A,@DPTR
+0268 FD                MOV     R5,A
+0269 D3                SETB    C
+026A ED                MOV     A,R5
+026B 9F                SUBB    A,R7
+026C EC                MOV     A,R4
+026D 9E                SUBB    A,R6
+026E 4046              JC      ?C0024
+0270 900000      R     MOV     DPTR,#widget
+0273 E0                MOVX    A,@DPTR
+0274 FF                MOV     R7,A
+0275 EF                MOV     A,R7
+0276 603E              JZ      ?C0024
+                                           ; SOURCE LINE # 505
+                                           ; SOURCE LINE # 508
+0278 900000      R     MOV     DPTR,#tempRaw
+027B E0                MOVX    A,@DPTR
+027C FE                MOV     R6,A
+027D A3                INC     DPTR
+027E E0                MOVX    A,@DPTR
+027F FF                MOV     R7,A
+0280 D3                SETB    C
+0281 EF                MOV     A,R7
+0282 94FF              SUBB    A,#0FFH
+0284 EE                MOV     A,R6
+0285 9400              SUBB    A,#00H
+0287 4013              JC      ?C0025
+                                           ; SOURCE LINE # 509
+                                           ; SOURCE LINE # 510
+0289 900000      R     MOV     DPTR,#sensor
+028C E0                MOVX    A,@DPTR
+028D FF                MOV     R7,A
+028E 7400        R     MOV     A,#LOW CapSense_SensorSignal
+0290 2F                ADD     A,R7
+0291 F582              MOV     DPL,A
+0293 E4                CLR     A
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 47  
+
+0294 3400        R     ADDC    A,#HIGH CapSense_SensorSignal
+0296 F583              MOV     DPH,A
+0298 74FF              MOV     A,#0FFH
+029A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 511
+029B 22                RET     
+029C         ?C0025:
+                                           ; SOURCE LINE # 513
+                                           ; SOURCE LINE # 514
+029C 900000      R     MOV     DPTR,#tempRaw
+029F E0                MOVX    A,@DPTR
+02A0 FE                MOV     R6,A
+02A1 A3                INC     DPTR
+02A2 E0                MOVX    A,@DPTR
+02A3 FF                MOV     R7,A
+02A4 900000      R     MOV     DPTR,#sensor
+02A7 E0                MOVX    A,@DPTR
+02A8 FE                MOV     R6,A
+02A9 7400        R     MOV     A,#LOW CapSense_SensorSignal
+02AB 2E                ADD     A,R6
+02AC F582              MOV     DPL,A
+02AE E4                CLR     A
+02AF 3400        R     ADDC    A,#HIGH CapSense_SensorSignal
+02B1 F583              MOV     DPH,A
+02B3 EF                MOV     A,R7
+02B4 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 515
+                                           ; SOURCE LINE # 519
+02B5 22                RET     
+02B6         ?C0024:
+                                           ; SOURCE LINE # 521
+                                           ; SOURCE LINE # 523
+02B6 900000      R     MOV     DPTR,#sensor
+02B9 E0                MOVX    A,@DPTR
+02BA FF                MOV     R7,A
+02BB 7400        R     MOV     A,#LOW CapSense_SensorSignal
+02BD 2F                ADD     A,R7
+02BE F582              MOV     DPL,A
+02C0 E4                CLR     A
+02C1 3400        R     ADDC    A,#HIGH CapSense_SensorSignal
+02C3 F583              MOV     DPH,A
+02C5 E4                CLR     A
+02C6 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 524
+                                           ; SOURCE LINE # 530
+02C7         ?C0028:
+02C7 22                RET     
+             ; FUNCTION _CapSense_UpdateSensorBaseline (END)
+
+             ; FUNCTION CapSense_UpdateEnabledBaselines (BEGIN)
+                                           ; SOURCE LINE # 562
+                                           ; SOURCE LINE # 563
+                                           ; SOURCE LINE # 568
+0000 900000      R     MOV     DPTR,#i
+0003 E4                CLR     A
+0004 F0                MOVX    @DPTR,A
+0005         ?C0029:
+0005 900000      R     MOV     DPTR,#i
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A EF                MOV     A,R7
+000B C3                CLR     C
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 48  
+
+000C 9402              SUBB    A,#02H
+000E 5057              JNC     ?C0033
+                                           ; SOURCE LINE # 569
+                                           ; SOURCE LINE # 570
+0010 900000      R     MOV     DPTR,#i
+0013 E0                MOVX    A,@DPTR
+0014 FF                MOV     R7,A
+0015 EF                MOV     A,R7
+0016 13                RRC     A
+0017 13                RRC     A
+0018 13                RRC     A
+0019 541F              ANL     A,#01FH
+001B FF                MOV     R7,A
+001C 900000      R     MOV     DPTR,#pos
+001F EF                MOV     A,R7
+0020 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 571
+0021 900000      R     MOV     DPTR,#i
+0024 E0                MOVX    A,@DPTR
+0025 FF                MOV     R7,A
+0026 EF                MOV     A,R7
+0027 5407              ANL     A,#07H
+0029 FF                MOV     R7,A
+002A 7401              MOV     A,#01H
+002C A807              MOV     R0,AR7
+002E 08                INC     R0
+002F 8002              SJMP    ?C0064
+0031         ?C0063:
+0031 C3                CLR     C
+0032 33                RLC     A
+0033         ?C0064:
+0033 D8FC              DJNZ    R0,?C0063
+0035 FF                MOV     R7,A
+0036 900000      R     MOV     DPTR,#enMask
+0039 EF                MOV     A,R7
+003A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 572
+003B 900000      R     MOV     DPTR,#pos
+003E E0                MOVX    A,@DPTR
+003F FF                MOV     R7,A
+0040 7400        E     MOV     A,#LOW CapSense_SensorEnableMask
+0042 2F                ADD     A,R7
+0043 F582              MOV     DPL,A
+0045 E4                CLR     A
+0046 3400        E     ADDC    A,#HIGH CapSense_SensorEnableMask
+0048 F583              MOV     DPH,A
+004A E0                MOVX    A,@DPTR
+004B FF                MOV     R7,A
+004C 900000      R     MOV     DPTR,#enMask
+004F E0                MOVX    A,@DPTR
+0050 FE                MOV     R6,A
+0051 EF                MOV     A,R7
+0052 5E                ANL     A,R6
+0053 FF                MOV     R7,A
+0054 EF                MOV     A,R7
+0055 6008              JZ      ?C0031
+                                           ; SOURCE LINE # 573
+                                           ; SOURCE LINE # 574
+0057 900000      R     MOV     DPTR,#i
+005A E0                MOVX    A,@DPTR
+005B FF                MOV     R7,A
+005C 120000      R     LCALL   _CapSense_UpdateSensorBaseline
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 49  
+
+                                           ; SOURCE LINE # 575
+                                           ; SOURCE LINE # 576
+005F         ?C0031:
+005F 900000      R     MOV     DPTR,#i
+0062 E0                MOVX    A,@DPTR
+0063 04                INC     A
+0064 F0                MOVX    @DPTR,A
+0065 809E              SJMP    ?C0029
+                                           ; SOURCE LINE # 577
+0067         ?C0033:
+0067 22                RET     
+             ; FUNCTION CapSense_UpdateEnabledBaselines (END)
+
+             ; FUNCTION _CapSense_CheckIsSensorActive (BEGIN)
+                                           ; SOURCE LINE # 619
+0000 900000      R     MOV     DPTR,#sensor
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 620
+                                           ; SOURCE LINE # 623
+0005 900000      R     MOV     DPTR,#sensor
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A EF                MOV     A,R7
+000B 13                RRC     A
+000C 13                RRC     A
+000D 13                RRC     A
+000E 541F              ANL     A,#01FH
+0010 FF                MOV     R7,A
+0011 900000      R     MOV     DPTR,#pos
+0014 EF                MOV     A,R7
+0015 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 624
+0016 900000      R     MOV     DPTR,#sensor
+0019 E0                MOVX    A,@DPTR
+001A FF                MOV     R7,A
+001B EF                MOV     A,R7
+001C 5407              ANL     A,#07H
+001E FF                MOV     R7,A
+001F 7401              MOV     A,#01H
+0021 A807              MOV     R0,AR7
+0023 08                INC     R0
+0024 8002              SJMP    ?C0066
+0026         ?C0065:
+0026 C3                CLR     C
+0027 33                RLC     A
+0028         ?C0066:
+0028 D8FC              DJNZ    R0,?C0065
+002A FF                MOV     R7,A
+002B 900000      R     MOV     DPTR,#onMask
+002E EF                MOV     A,R7
+002F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 626
+0030 900000      R     MOV     DPTR,#sensor
+0033 E0                MOVX    A,@DPTR
+0034 FF                MOV     R7,A
+0035 EF                MOV     A,R7
+0036 900000      E     MOV     DPTR,#CapSense_widgetNumber
+0039 93                MOVC    A,@A+DPTR
+003A FF                MOV     R7,A
+003B 900000      R     MOV     DPTR,#widget
+003E EF                MOV     A,R7
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 50  
+
+003F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 627
+0040 900000      R     MOV     DPTR,#widget
+0043 E0                MOVX    A,@DPTR
+0044 FF                MOV     R7,A
+0045 7400        R     MOV     A,#LOW CapSense_fingerThreshold
+0047 2F                ADD     A,R7
+0048 F582              MOV     DPL,A
+004A E4                CLR     A
+004B 3400        R     ADDC    A,#HIGH CapSense_fingerThreshold
+004D F583              MOV     DPH,A
+004F E0                MOVX    A,@DPTR
+0050 FF                MOV     R7,A
+0051 900000      R     MOV     DPTR,#fingerThreshold
+0054 EF                MOV     A,R7
+0055 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 628
+0056 900000      R     MOV     DPTR,#widget
+0059 E0                MOVX    A,@DPTR
+005A FF                MOV     R7,A
+005B 7400        R     MOV     A,#LOW CapSense_hysteresis
+005D 2F                ADD     A,R7
+005E F582              MOV     DPL,A
+0060 E4                CLR     A
+0061 3400        R     ADDC    A,#HIGH CapSense_hysteresis
+0063 F583              MOV     DPH,A
+0065 E0                MOVX    A,@DPTR
+0066 FF                MOV     R7,A
+0067 900000      R     MOV     DPTR,#hysteresis
+006A EF                MOV     A,R7
+006B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 629
+006C 900000      R     MOV     DPTR,#widget
+006F E0                MOVX    A,@DPTR
+0070 FF                MOV     R7,A
+0071 7400        R     MOV     A,#LOW CapSense_debounce
+0073 2F                ADD     A,R7
+0074 F582              MOV     DPL,A
+0076 E4                CLR     A
+0077 3400        R     ADDC    A,#HIGH CapSense_debounce
+0079 F583              MOV     DPH,A
+007B E0                MOVX    A,@DPTR
+007C FF                MOV     R7,A
+007D 900000      R     MOV     DPTR,#debounce
+0080 EF                MOV     A,R7
+0081 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 631
+0082 900000      R     MOV     DPTR,#widget
+0085 E0                MOVX    A,@DPTR
+0086 FF                MOV     R7,A
+0087 900000      R     MOV     DPTR,#debounceIndex
+008A EF                MOV     A,R7
+008B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 635
+008C 900000      R     MOV     DPTR,#pos
+008F E0                MOVX    A,@DPTR
+0090 FF                MOV     R7,A
+0091 7400        R     MOV     A,#LOW CapSense_SensorOnMask
+0093 2F                ADD     A,R7
+0094 F582              MOV     DPL,A
+0096 E4                CLR     A
+0097 3400        R     ADDC    A,#HIGH CapSense_SensorOnMask
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 51  
+
+0099 F583              MOV     DPH,A
+009B E0                MOVX    A,@DPTR
+009C FF                MOV     R7,A
+009D 900000      R     MOV     DPTR,#onMask
+00A0 E0                MOVX    A,@DPTR
+00A1 FE                MOV     R6,A
+00A2 EF                MOV     A,R7
+00A3 5E                ANL     A,R6
+00A4 FF                MOV     R7,A
+00A5 EF                MOV     A,R7
+00A6 6065              JZ      ?C0034
+                                           ; SOURCE LINE # 636
+                                           ; SOURCE LINE # 638
+00A8 900000      R     MOV     DPTR,#hysteresis
+00AB E0                MOVX    A,@DPTR
+00AC FF                MOV     R7,A
+00AD 900000      R     MOV     DPTR,#fingerThreshold
+00B0 E0                MOVX    A,@DPTR
+00B1 FE                MOV     R6,A
+00B2 C3                CLR     C
+00B3 EE                MOV     A,R6
+00B4 9F                SUBB    A,R7
+00B5 FF                MOV     R7,A
+00B6 900000      R     MOV     DPTR,#sensor
+00B9 E0                MOVX    A,@DPTR
+00BA FE                MOV     R6,A
+00BB 7400        R     MOV     A,#LOW CapSense_SensorSignal
+00BD 2E                ADD     A,R6
+00BE F582              MOV     DPL,A
+00C0 E4                CLR     A
+00C1 3400        R     ADDC    A,#HIGH CapSense_SensorSignal
+00C3 F583              MOV     DPH,A
+00C5 E0                MOVX    A,@DPTR
+00C6 FE                MOV     R6,A
+00C7 EE                MOV     A,R6
+00C8 C3                CLR     C
+00C9 9F                SUBB    A,R7
+00CA 4003              JC      $ + 5H
+00CC 020000      R     LJMP    ?C0036
+                                           ; SOURCE LINE # 639
+                                           ; SOURCE LINE # 640
+00CF 900000      R     MOV     DPTR,#pos
+00D2 E0                MOVX    A,@DPTR
+00D3 FF                MOV     R7,A
+00D4 7400        R     MOV     A,#LOW CapSense_SensorOnMask
+00D6 2F                ADD     A,R7
+00D7 F582              MOV     DPL,A
+00D9 E4                CLR     A
+00DA 3400        R     ADDC    A,#HIGH CapSense_SensorOnMask
+00DC F583              MOV     DPH,A
+00DE C083              PUSH    DPH
+00E0 C082              PUSH    DPL
+00E2 E0                MOVX    A,@DPTR
+00E3 FF                MOV     R7,A
+00E4 900000      R     MOV     DPTR,#onMask
+00E7 E0                MOVX    A,@DPTR
+00E8 FE                MOV     R6,A
+00E9 EE                MOV     A,R6
+00EA F4                CPL     A
+00EB FE                MOV     R6,A
+00EC EF                MOV     A,R7
+00ED 5E                ANL     A,R6
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 52  
+
+00EE FF                MOV     R7,A
+00EF D082              POP     DPL
+00F1 D083              POP     DPH
+00F3 EF                MOV     A,R7
+00F4 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 641
+00F5 900000      R     MOV     DPTR,#debounce
+00F8 E0                MOVX    A,@DPTR
+00F9 FF                MOV     R7,A
+00FA 900000      R     MOV     DPTR,#debounceIndex
+00FD E0                MOVX    A,@DPTR
+00FE FE                MOV     R6,A
+00FF 7400        R     MOV     A,#LOW CapSense_debounceCounter
+0101 2E                ADD     A,R6
+0102 F582              MOV     DPL,A
+0104 E4                CLR     A
+0105 3400        R     ADDC    A,#HIGH CapSense_debounceCounter
+0107 F583              MOV     DPH,A
+0109 EF                MOV     A,R7
+010A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 642
+                                           ; SOURCE LINE # 643
+010B 8077              SJMP    ?C0036
+010D         ?C0034:
+                                           ; SOURCE LINE # 645
+                                           ; SOURCE LINE # 647
+010D 900000      R     MOV     DPTR,#hysteresis
+0110 E0                MOVX    A,@DPTR
+0111 FF                MOV     R7,A
+0112 900000      R     MOV     DPTR,#fingerThreshold
+0115 E0                MOVX    A,@DPTR
+0116 FE                MOV     R6,A
+0117 EE                MOV     A,R6
+0118 2F                ADD     A,R7
+0119 FF                MOV     R7,A
+011A 900000      R     MOV     DPTR,#sensor
+011D E0                MOVX    A,@DPTR
+011E FE                MOV     R6,A
+011F 7400        R     MOV     A,#LOW CapSense_SensorSignal
+0121 2E                ADD     A,R6
+0122 F582              MOV     DPL,A
+0124 E4                CLR     A
+0125 3400        R     ADDC    A,#HIGH CapSense_SensorSignal
+0127 F583              MOV     DPH,A
+0129 E0                MOVX    A,@DPTR
+012A FE                MOV     R6,A
+012B EE                MOV     A,R6
+012C D3                SETB    C
+012D 9F                SUBB    A,R7
+012E 403E              JC      ?C0037
+                                           ; SOURCE LINE # 648
+                                           ; SOURCE LINE # 650
+0130 900000      R     MOV     DPTR,#debounceIndex
+0133 E0                MOVX    A,@DPTR
+0134 FF                MOV     R7,A
+0135 7400        R     MOV     A,#LOW CapSense_debounceCounter
+0137 2F                ADD     A,R7
+0138 F582              MOV     DPL,A
+013A E4                CLR     A
+013B 3400        R     ADDC    A,#HIGH CapSense_debounceCounter
+013D F583              MOV     DPH,A
+013F E0                MOVX    A,@DPTR
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 53  
+
+0140 FF                MOV     R7,A
+0141 14                DEC     A
+0142 F0                MOVX    @DPTR,A
+0143 EF                MOV     A,R7
+0144 D3                SETB    C
+0145 9401              SUBB    A,#01H
+0147 503B              JNC     ?C0036
+                                           ; SOURCE LINE # 651
+                                           ; SOURCE LINE # 652
+0149 900000      R     MOV     DPTR,#pos
+014C E0                MOVX    A,@DPTR
+014D FF                MOV     R7,A
+014E 7400        R     MOV     A,#LOW CapSense_SensorOnMask
+0150 2F                ADD     A,R7
+0151 F582              MOV     DPL,A
+0153 E4                CLR     A
+0154 3400        R     ADDC    A,#HIGH CapSense_SensorOnMask
+0156 F583              MOV     DPH,A
+0158 C083              PUSH    DPH
+015A C082              PUSH    DPL
+015C E0                MOVX    A,@DPTR
+015D FF                MOV     R7,A
+015E 900000      R     MOV     DPTR,#onMask
+0161 E0                MOVX    A,@DPTR
+0162 FE                MOV     R6,A
+0163 EF                MOV     A,R7
+0164 4E                ORL     A,R6
+0165 FF                MOV     R7,A
+0166 D082              POP     DPL
+0168 D083              POP     DPH
+016A EF                MOV     A,R7
+016B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 653
+                                           ; SOURCE LINE # 654
+016C 8016              SJMP    ?C0036
+016E         ?C0037:
+                                           ; SOURCE LINE # 656
+                                           ; SOURCE LINE # 658
+016E 900000      R     MOV     DPTR,#debounce
+0171 E0                MOVX    A,@DPTR
+0172 FF                MOV     R7,A
+0173 900000      R     MOV     DPTR,#debounceIndex
+0176 E0                MOVX    A,@DPTR
+0177 FE                MOV     R6,A
+0178 7400        R     MOV     A,#LOW CapSense_debounceCounter
+017A 2E                ADD     A,R6
+017B F582              MOV     DPL,A
+017D E4                CLR     A
+017E 3400        R     ADDC    A,#HIGH CapSense_debounceCounter
+0180 F583              MOV     DPH,A
+0182 EF                MOV     A,R7
+0183 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 659
+                                           ; SOURCE LINE # 660
+0184         ?C0036:
+                                           ; SOURCE LINE # 662
+0184 900000      R     MOV     DPTR,#pos
+0187 E0                MOVX    A,@DPTR
+0188 FF                MOV     R7,A
+0189 7400        R     MOV     A,#LOW CapSense_SensorOnMask
+018B 2F                ADD     A,R7
+018C F582              MOV     DPL,A
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 54  
+
+018E E4                CLR     A
+018F 3400        R     ADDC    A,#HIGH CapSense_SensorOnMask
+0191 F583              MOV     DPH,A
+0193 E0                MOVX    A,@DPTR
+0194 FF                MOV     R7,A
+0195 900000      R     MOV     DPTR,#onMask
+0198 E0                MOVX    A,@DPTR
+0199 FE                MOV     R6,A
+019A EF                MOV     A,R7
+019B 5E                ANL     A,R6
+019C FF                MOV     R7,A
+019D EF                MOV     A,R7
+019E 6004              JZ      ?C0040
+01A0 7F01              MOV     R7,#01H
+01A2 8002              SJMP    ?C0041
+01A4         ?C0040:
+01A4 7F00              MOV     R7,#00H
+01A6         ?C0041:
+                                           ; SOURCE LINE # 663
+01A6         ?C0042:
+01A6 22                RET     
+             ; FUNCTION _CapSense_CheckIsSensorActive (END)
+
+             ; FUNCTION _CapSense_CheckIsWidgetActive (BEGIN)
+                                           ; SOURCE LINE # 689
+0000 900000      R     MOV     DPTR,#widget
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 690
+                                           ; SOURCE LINE # 691
+0005 900000      R     MOV     DPTR,#widget
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A EF                MOV     A,R7
+000B 900000      R     MOV     DPTR,#CapSense_rawDataIndex
+000E 93                MOVC    A,@A+DPTR
+000F FF                MOV     R7,A
+0010 900000      R     MOV     DPTR,#rawIndex
+0013 EF                MOV     A,R7
+0014 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 692
+0015 900000      R     MOV     DPTR,#widget
+0018 E0                MOVX    A,@DPTR
+0019 FF                MOV     R7,A
+001A EF                MOV     A,R7
+001B 900000      R     MOV     DPTR,#CapSense_numberOfSensors
+001E 93                MOVC    A,@A+DPTR
+001F FF                MOV     R7,A
+0020 900000      R     MOV     DPTR,#rawIndex
+0023 E0                MOVX    A,@DPTR
+0024 FE                MOV     R6,A
+0025 EF                MOV     A,R7
+0026 2E                ADD     A,R6
+0027 FF                MOV     R7,A
+0028 900000      R     MOV     DPTR,#numberOfSensors
+002B EF                MOV     A,R7
+002C F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 693
+002D 900000      R     MOV     DPTR,#state
+0030 E4                CLR     A
+0031 F0                MOVX    @DPTR,A
+0032         ?C0045:
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 55  
+
+                                           ; SOURCE LINE # 697
+                                           ; SOURCE LINE # 698
+0032 900000      R     MOV     DPTR,#rawIndex
+0035 E0                MOVX    A,@DPTR
+0036 FF                MOV     R7,A
+0037 120000      R     LCALL   _CapSense_CheckIsSensorActive
+003A EF                MOV     A,R7
+003B 6006              JZ      ?C0046
+                                           ; SOURCE LINE # 699
+                                           ; SOURCE LINE # 700
+003D 900000      R     MOV     DPTR,#state
+0040 7401              MOV     A,#01H
+0042 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 701
+0043         ?C0046:
+                                           ; SOURCE LINE # 702
+0043 900000      R     MOV     DPTR,#rawIndex
+0046 E0                MOVX    A,@DPTR
+0047 04                INC     A
+0048 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 703
+                                           ; SOURCE LINE # 704
+0049 900000      R     MOV     DPTR,#numberOfSensors
+004C E0                MOVX    A,@DPTR
+004D FF                MOV     R7,A
+004E 900000      R     MOV     DPTR,#rawIndex
+0051 E0                MOVX    A,@DPTR
+0052 FE                MOV     R6,A
+0053 EE                MOV     A,R6
+0054 C3                CLR     C
+0055 9F                SUBB    A,R7
+0056 40DA              JC      ?C0045
+                                           ; SOURCE LINE # 708
+0058 900000      R     MOV     DPTR,#state
+005B E0                MOVX    A,@DPTR
+005C FF                MOV     R7,A
+                                           ; SOURCE LINE # 709
+005D         ?C0047:
+005D 22                RET     
+             ; FUNCTION _CapSense_CheckIsWidgetActive (END)
+
+             ; FUNCTION CapSense_CheckIsAnyWidgetActive (BEGIN)
+                                           ; SOURCE LINE # 732
+                                           ; SOURCE LINE # 733
+                                           ; SOURCE LINE # 735
+0000 900000      R     MOV     DPTR,#state
+0003 E4                CLR     A
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 737
+0005 900000      R     MOV     DPTR,#i
+0008 E4                CLR     A
+0009 F0                MOVX    @DPTR,A
+000A         ?C0048:
+000A 900000      R     MOV     DPTR,#i
+000D E0                MOVX    A,@DPTR
+000E FF                MOV     R7,A
+000F EF                MOV     A,R7
+0010 C3                CLR     C
+0011 9402              SUBB    A,#02H
+0013 5019              JNC     ?C0049
+                                           ; SOURCE LINE # 738
+                                           ; SOURCE LINE # 739
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 56  
+
+0015 900000      R     MOV     DPTR,#i
+0018 E0                MOVX    A,@DPTR
+0019 FF                MOV     R7,A
+001A 120000      R     LCALL   _CapSense_CheckIsWidgetActive
+001D EF                MOV     A,R7
+001E 6006              JZ      ?C0050
+                                           ; SOURCE LINE # 740
+                                           ; SOURCE LINE # 741
+0020 900000      R     MOV     DPTR,#state
+0023 7401              MOV     A,#01H
+0025 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 742
+                                           ; SOURCE LINE # 743
+0026         ?C0050:
+0026 900000      R     MOV     DPTR,#i
+0029 E0                MOVX    A,@DPTR
+002A 04                INC     A
+002B F0                MOVX    @DPTR,A
+002C 80DC              SJMP    ?C0048
+002E         ?C0049:
+                                           ; SOURCE LINE # 746
+002E 900000      R     MOV     DPTR,#state
+0031 E0                MOVX    A,@DPTR
+0032 FF                MOV     R7,A
+                                           ; SOURCE LINE # 747
+0033         ?C0052:
+0033 22                RET     
+             ; FUNCTION CapSense_CheckIsAnyWidgetActive (END)
+
+             ; FUNCTION _CapSense_EnableWidget (BEGIN)
+                                           ; SOURCE LINE # 777
+0000 900000      R     MOV     DPTR,#widget
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 778
+                                           ; SOURCE LINE # 781
+0005 900000      R     MOV     DPTR,#widget
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A EF                MOV     A,R7
+000B 900000      R     MOV     DPTR,#CapSense_rawDataIndex
+000E 93                MOVC    A,@A+DPTR
+000F FF                MOV     R7,A
+0010 900000      R     MOV     DPTR,#rawIndex
+0013 EF                MOV     A,R7
+0014 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 782
+0015 900000      R     MOV     DPTR,#widget
+0018 E0                MOVX    A,@DPTR
+0019 FF                MOV     R7,A
+001A EF                MOV     A,R7
+001B 900000      R     MOV     DPTR,#CapSense_numberOfSensors
+001E 93                MOVC    A,@A+DPTR
+001F FF                MOV     R7,A
+0020 900000      R     MOV     DPTR,#rawIndex
+0023 E0                MOVX    A,@DPTR
+0024 FE                MOV     R6,A
+0025 EF                MOV     A,R7
+0026 2E                ADD     A,R6
+0027 FF                MOV     R7,A
+0028 900000      R     MOV     DPTR,#numberOfSensors
+002B EF                MOV     A,R7
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 57  
+
+002C F0                MOVX    @DPTR,A
+002D         ?C0055:
+                                           ; SOURCE LINE # 786
+                                           ; SOURCE LINE # 787
+002D 900000      R     MOV     DPTR,#rawIndex
+0030 E0                MOVX    A,@DPTR
+0031 FF                MOV     R7,A
+0032 EF                MOV     A,R7
+0033 13                RRC     A
+0034 13                RRC     A
+0035 13                RRC     A
+0036 541F              ANL     A,#01FH
+0038 FF                MOV     R7,A
+0039 900000      R     MOV     DPTR,#pos
+003C EF                MOV     A,R7
+003D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 788
+003E 900000      R     MOV     DPTR,#rawIndex
+0041 E0                MOVX    A,@DPTR
+0042 FF                MOV     R7,A
+0043 EF                MOV     A,R7
+0044 5407              ANL     A,#07H
+0046 FF                MOV     R7,A
+0047 7401              MOV     A,#01H
+0049 A807              MOV     R0,AR7
+004B 08                INC     R0
+004C 8002              SJMP    ?C0068
+004E         ?C0067:
+004E C3                CLR     C
+004F 33                RLC     A
+0050         ?C0068:
+0050 D8FC              DJNZ    R0,?C0067
+0052 FF                MOV     R7,A
+0053 900000      R     MOV     DPTR,#enMask
+0056 EF                MOV     A,R7
+0057 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 790
+0058 900000      R     MOV     DPTR,#pos
+005B E0                MOVX    A,@DPTR
+005C FF                MOV     R7,A
+005D 7400        E     MOV     A,#LOW CapSense_SensorEnableMask
+005F 2F                ADD     A,R7
+0060 F582              MOV     DPL,A
+0062 E4                CLR     A
+0063 3400        E     ADDC    A,#HIGH CapSense_SensorEnableMask
+0065 F583              MOV     DPH,A
+0067 C083              PUSH    DPH
+0069 C082              PUSH    DPL
+006B E0                MOVX    A,@DPTR
+006C FF                MOV     R7,A
+006D 900000      R     MOV     DPTR,#enMask
+0070 E0                MOVX    A,@DPTR
+0071 FE                MOV     R6,A
+0072 EF                MOV     A,R7
+0073 4E                ORL     A,R6
+0074 FF                MOV     R7,A
+0075 D082              POP     DPL
+0077 D083              POP     DPH
+0079 EF                MOV     A,R7
+007A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 791
+007B 900000      R     MOV     DPTR,#rawIndex
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 58  
+
+007E E0                MOVX    A,@DPTR
+007F 04                INC     A
+0080 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 792
+                                           ; SOURCE LINE # 793
+0081 900000      R     MOV     DPTR,#numberOfSensors
+0084 E0                MOVX    A,@DPTR
+0085 FF                MOV     R7,A
+0086 900000      R     MOV     DPTR,#rawIndex
+0089 E0                MOVX    A,@DPTR
+008A FE                MOV     R6,A
+008B EE                MOV     A,R6
+008C C3                CLR     C
+008D 9F                SUBB    A,R7
+008E 409D              JC      ?C0055
+                                           ; SOURCE LINE # 796
+0090 22                RET     
+             ; FUNCTION _CapSense_EnableWidget (END)
+
+             ; FUNCTION _CapSense_DisableWidget (BEGIN)
+                                           ; SOURCE LINE # 826
+0000 900000      R     MOV     DPTR,#widget
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 827
+                                           ; SOURCE LINE # 830
+0005 900000      R     MOV     DPTR,#widget
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A EF                MOV     A,R7
+000B 900000      R     MOV     DPTR,#CapSense_rawDataIndex
+000E 93                MOVC    A,@A+DPTR
+000F FF                MOV     R7,A
+0010 900000      R     MOV     DPTR,#rawIndex
+0013 EF                MOV     A,R7
+0014 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 831
+0015 900000      R     MOV     DPTR,#widget
+0018 E0                MOVX    A,@DPTR
+0019 FF                MOV     R7,A
+001A EF                MOV     A,R7
+001B 900000      R     MOV     DPTR,#CapSense_numberOfSensors
+001E 93                MOVC    A,@A+DPTR
+001F FF                MOV     R7,A
+0020 900000      R     MOV     DPTR,#rawIndex
+0023 E0                MOVX    A,@DPTR
+0024 FE                MOV     R6,A
+0025 EF                MOV     A,R7
+0026 2E                ADD     A,R6
+0027 FF                MOV     R7,A
+0028 900000      R     MOV     DPTR,#numberOfSensors
+002B EF                MOV     A,R7
+002C F0                MOVX    @DPTR,A
+002D         ?C0059:
+                                           ; SOURCE LINE # 835
+                                           ; SOURCE LINE # 836
+002D 900000      R     MOV     DPTR,#rawIndex
+0030 E0                MOVX    A,@DPTR
+0031 FF                MOV     R7,A
+0032 EF                MOV     A,R7
+0033 13                RRC     A
+0034 13                RRC     A
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 59  
+
+0035 13                RRC     A
+0036 541F              ANL     A,#01FH
+0038 FF                MOV     R7,A
+0039 900000      R     MOV     DPTR,#pos
+003C EF                MOV     A,R7
+003D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 837
+003E 900000      R     MOV     DPTR,#rawIndex
+0041 E0                MOVX    A,@DPTR
+0042 FF                MOV     R7,A
+0043 EF                MOV     A,R7
+0044 5407              ANL     A,#07H
+0046 FF                MOV     R7,A
+0047 7401              MOV     A,#01H
+0049 A807              MOV     R0,AR7
+004B 08                INC     R0
+004C 8002              SJMP    ?C0070
+004E         ?C0069:
+004E C3                CLR     C
+004F 33                RLC     A
+0050         ?C0070:
+0050 D8FC              DJNZ    R0,?C0069
+0052 FF                MOV     R7,A
+0053 900000      R     MOV     DPTR,#enMask
+0056 EF                MOV     A,R7
+0057 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 839
+0058 900000      R     MOV     DPTR,#pos
+005B E0                MOVX    A,@DPTR
+005C FF                MOV     R7,A
+005D 7400        E     MOV     A,#LOW CapSense_SensorEnableMask
+005F 2F                ADD     A,R7
+0060 F582              MOV     DPL,A
+0062 E4                CLR     A
+0063 3400        E     ADDC    A,#HIGH CapSense_SensorEnableMask
+0065 F583              MOV     DPH,A
+0067 C083              PUSH    DPH
+0069 C082              PUSH    DPL
+006B E0                MOVX    A,@DPTR
+006C FF                MOV     R7,A
+006D 900000      R     MOV     DPTR,#enMask
+0070 E0                MOVX    A,@DPTR
+0071 FE                MOV     R6,A
+0072 EE                MOV     A,R6
+0073 F4                CPL     A
+0074 FE                MOV     R6,A
+0075 EF                MOV     A,R7
+0076 5E                ANL     A,R6
+0077 FF                MOV     R7,A
+0078 D082              POP     DPL
+007A D083              POP     DPH
+007C EF                MOV     A,R7
+007D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 840
+007E 900000      R     MOV     DPTR,#rawIndex
+0081 E0                MOVX    A,@DPTR
+0082 04                INC     A
+0083 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 841
+                                           ; SOURCE LINE # 842
+0084 900000      R     MOV     DPTR,#numberOfSensors
+0087 E0                MOVX    A,@DPTR
+C51 COMPILER V9.03   CAPSENSE_CSHL                                                         08/28/2015 10:18:32 PAGE 60  
+
+0088 FF                MOV     R7,A
+0089 900000      R     MOV     DPTR,#rawIndex
+008C E0                MOVX    A,@DPTR
+008D FE                MOV     R6,A
+008E EE                MOV     A,R6
+008F C3                CLR     C
+0090 9F                SUBB    A,R7
+0091 409A              JC      ?C0059
+                                           ; SOURCE LINE # 845
+0093 22                RET     
+             ; FUNCTION _CapSense_DisableWidget (END)
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2008    ----
+   CONSTANT SIZE    =      4    ----
+   XDATA SIZE       =     22      45
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
