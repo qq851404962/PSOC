@@ -1,0 +1,347 @@
+C51 COMPILER V9.03   CAPSENSE_SMS_WRAPPER                                                  08/27/2015 14:50:40 PAGE 1   
+
+
+C51 COMPILER V9.03, COMPILATION OF MODULE CAPSENSE_SMS_WRAPPER
+OBJECT MODULE PLACED IN .\DP8051\DP8051_Keil_903\Debug\CapSense_SMS_Wrapper.obj
+COMPILER INVOKED BY: C:\Program Files (x86)\Cypress\PSoC Creator\2.0\PSoC Creator\import\keil\pk51\9.03\C51\BIN\c51.exe 
+                    -.\Generated_Source\PSoC3\CapSense_SMS_Wrapper.c NOIV LARGE MODDP2 OMF2 VB(1) PR(.\DP8051\DP8051_Keil_903\Debug\CapSense_
+                    -SMS_Wrapper.lst) CD DB NOIP OT(2,SIZE) INCDIR(Generated_Source\PSoC3) OJ(.\DP8051\DP8051_Keil_903\Debug\CapSense_SMS_Wra
+                    -pper.obj)
+
+line level    source
+
+   1          /*******************************************************************************
+   2          * File Name: CapSense_SMS_Wrapper.c
+   3          * Version 3.10
+   4          *
+   5          * Description:
+   6          *  This file provides the source code of wrapper between CapSense CSD component 
+   7          *  and Auto Tuning library.
+   8          *
+   9          * Note:
+  10          *
+  11          ********************************************************************************
+  12          * Copyright 2008-2011, Cypress Semiconductor Corporation.  All rights reserved.
+  13          * You may use this file only in accordance with the license, terms, conditions,
+  14          * disclaimers, and limitations in the end user license agreement accompanying
+  15          * the software package with which this file was provided.
+  16          *******************************************************************************/
+  17          
+  18          #include "CapSense.h"
+  19          #include "CapSense_CSHL.h"
+  20          
+  21          #if (CapSense_TUNING_METHOD == CapSense_AUTO_TUNING)
+  22          
+  23          extern uint8 CapSense_noiseThreshold[];
+  24          extern uint8 CapSense_hysteresis[];
+  25          
+  26          extern uint8 CapSense_widgetResolution[];
+  27          
+  28          extern const uint8 CYCODE CapSense_widgetNumber[];
+  29          extern const uint8 CYCODE CapSense_numberOfSensors[];
+  30          
+  31          extern uint8 CapSense_fingerThreshold[];
+  32          extern uint8 CapSense_idacSettings[];
+  33          extern uint8 CapSense_AnalogSwitchDivider[];
+  34          
+  35          extern uint16 CapSense_SensorRaw[];
+  36          extern uint16 CapSense_SensorBaseline[];
+  37          extern uint8  CapSense_SensorSignal[];
+  38          
+  39          extern void SMS_LIB_V3_CalculateThresholds(uint8 SensorNumber);
+  40          extern void SMS_LIB_V3_AutoTune1Ch(void);
+  41          extern void SMS_LIB_V3_AutoTune2Ch(void);
+  42          
+  43          uint8 * SMS_LIB_noiseThreshold = CapSense_noiseThreshold;
+  44          uint8 * SMS_LIB_hysteresis = CapSense_hysteresis;
+  45          
+  46          uint8 * SMS_LIB_widgetResolution = CapSense_widgetResolution;
+  47          
+  48          const uint8 CYCODE * SMS_LIB_widgetNumber = CapSense_widgetNumber;
+  49          const uint8 CYCODE * SMS_LIB_numberOfSensors = CapSense_numberOfSensors;
+  50          
+  51          uint8 * SMS_LIB_fingerThreshold = CapSense_fingerThreshold;
+  52          uint8 * SMS_LIB_idacSettings = CapSense_idacSettings;
+C51 COMPILER V9.03   CAPSENSE_SMS_WRAPPER                                                  08/27/2015 14:50:40 PAGE 2   
+
+  53          uint8 * SMS_LIB_prescaler = CapSense_AnalogSwitchDivider;
+  54          
+  55          uint16 * SMS_LIB_SensorRaw = CapSense_SensorRaw;
+  56          uint16 * SMS_LIB_SensorBaseline = CapSense_SensorBaseline;
+  57          
+  58          const uint8 CYCODE SMS_LIB_SensorSensitivity[] = {
+  59              2, 2, 2, 2, 2, 2, 2, 
+  60          };
+  61          
+  62          
+  63          const uint8 CYCODE SMS_LIB_PrescalerTbl[] = {
+  64              1u, 1u, 1u, 1u, 1u, 1u, 2u, 2u, 2u, 2u, 2u, 3u, 3u, 3u, 3u, 3u, 3u, 4u, 4u, 4u, 4u, 4u, 4u, 5u, 5u, 5u
+             -, 5u, 5u, 5u, 6u, 6u, 6u, 
+  65          };
+  66          
+  67          
+  68          
+  69          uint8 SMS_LIB_Table1[CapSense_TOTAL_SENSOR_COUNT];
+  70          uint8 SMS_LIB_Table2[CapSense_TOTAL_SENSOR_COUNT];
+  71          uint8 SMS_LIB_Table3[CapSense_TOTAL_SENSOR_COUNT];
+  72          uint16 SMS_LIB_Table4[CapSense_TOTAL_SENSOR_COUNT];
+  73          uint16 SMS_LIB_Table5[CapSense_TOTAL_SENSOR_COUNT];
+  74          uint8 SMS_LIB_Table6[CapSense_TOTAL_SENSOR_COUNT];
+  75          uint8 SMS_LIB_Table7[CapSense_TOTAL_SENSOR_COUNT];
+  76          
+  77          uint8 SMS_LIB_Table8[CapSense_END_OF_WIDGETS_INDEX];
+  78          uint8 SMS_LIB_Table9[CapSense_END_OF_WIDGETS_INDEX];
+  79          uint8 SMS_LIB_Table10[CapSense_END_OF_WIDGETS_INDEX];
+  80          
+  81          uint8 SMS_LIB_Var1 = (5u);
+  82          uint16 SMS_LIB_Var2 = (10738u);
+  83          
+  84          uint8 SMS_LIB_TotalSnsCnt = CapSense_TOTAL_SENSOR_COUNT;
+  85          uint8 SMS_LIB_TotalScanSlCnt = CapSense_TOTAL_SCANSLOT_COUNT;
+  86          uint8 SMS_LIB_EndOfWidgInd = CapSense_END_OF_WIDGETS_INDEX;
+  87          
+  88          #if (CapSense_DESIGN_TYPE == CapSense_TWO_CHANNELS_DESIGN)
+                  uint8 SMS_LIB_TotalSnsCnt_CH0 = CapSense_TOTAL_SENSOR_COUNT__CH0;
+                  uint8 SMS_LIB_TotalSnsCnt_CH1 = CapSense_TOTAL_SENSOR_COUNT__CH1;
+              #else
+  92              uint8 SMS_LIB_TotalSnsCnt_CH0 = 0;
+  93              uint8 SMS_LIB_TotalSnsCnt_CH1 = 0;
+  94          #endif  /* End (CapSense_DESIGN_TYPE == CapSense_TWO_CHANNELS_DESIGN) */
+  95          
+  96          /*******************************************************************************
+  97          * Function Name: SMS_LIB_ScanSensor
+  98          ********************************************************************************
+  99          *
+ 100          * Summary:
+ 101          *  Wrapper to CapSense_ScanSensor function.
+ 102          *
+ 103          * Parameters:
+ 104          *  SensorNumber:  Sensor number.
+ 105          *
+ 106          * Return:
+ 107          *  None
+ 108          *
+ 109          * Reentrant:
+ 110          *  No
+ 111          *
+ 112          *******************************************************************************/
+ 113          void SMS_LIB_ScanSensor(uint8 SensorNumber)
+C51 COMPILER V9.03   CAPSENSE_SMS_WRAPPER                                                  08/27/2015 14:50:40 PAGE 3   
+
+ 114          {
+ 115   1          CapSense_ScanSensor(SensorNumber);
+ 116   1      }
+ 117          
+ 118          /*******************************************************************************
+ 119          * Function Name: SMS_LIB_IsBusy
+ 120          ********************************************************************************
+ 121          *
+ 122          * Summary:
+ 123          *  Wrapper to CapSense_IsBusy function.
+ 124          *  
+ 125          * Parameters:
+ 126          *  None
+ 127          *
+ 128          * Return:
+ 129          *  None
+ 130          *
+ 131          *******************************************************************************/
+ 132          uint8 SMS_LIB_IsBusy(void)
+ 133          {
+ 134   1          return CapSense_IsBusy();
+ 135   1      }
+ 136          
+ 137          /*******************************************************************************
+ 138          * Function Name: CapSense_CalculateThresholds
+ 139          ********************************************************************************
+ 140          *
+ 141          * Summary:
+ 142          *  Wrapper to SMS_LIB_CalculateThresholds function.
+ 143          *
+ 144          * Parameters:
+ 145          *  SensorNumber:  Sensor number.
+ 146          *
+ 147          * Return:
+ 148          *  None
+ 149          *
+ 150          * Reentrant:
+ 151          *  No
+ 152          *
+ 153          *******************************************************************************/
+ 154          void CapSense_CalculateThresholds(uint8 SensorNumber)
+ 155          {
+ 156   1          SMS_LIB_V3_CalculateThresholds(SensorNumber);
+ 157   1      }
+ 158          
+ 159          /*******************************************************************************
+ 160          * Function Name: CapSense_AutoTune
+ 161          ********************************************************************************
+ 162          *
+ 163          * Summary:
+ 164          *  Wrapper for SMS_LIB_AutoTune1Ch or SMS_LIB_AutoTune2Ch function.
+ 165          *
+ 166          * Parameters:
+ 167          *  None
+ 168          *
+ 169          * Return:
+ 170          *  None
+ 171          *
+ 172          * Reentrant:
+ 173          *  No
+ 174          *
+ 175          *******************************************************************************/
+C51 COMPILER V9.03   CAPSENSE_SMS_WRAPPER                                                  08/27/2015 14:50:40 PAGE 4   
+
+ 176          void CapSense_AutoTune(void)
+ 177          {
+ 178   1          #if (CapSense_DESIGN_TYPE == CapSense_ONE_CHANNEL_DESIGN)
+ 179   1              SMS_LIB_V3_AutoTune1Ch();
+ 180   1          #elif (CapSense_DESIGN_TYPE == CapSense_TWO_CHANNELS_DESIGN)
+                      SMS_LIB_V3_AutoTune2Ch();
+                  #endif /* End (CapSense_DESIGN_TYPE == CapSense_ONE_CHANNEL_DESIGN) */
+ 183   1      }
+ 184          
+ 185          /*******************************************************************************
+ 186          * Function Name: SMS_LIB_SetPrescaler
+ 187          ********************************************************************************
+ 188          *
+ 189          * Summary:
+ 190          *  Empty wrapper for version compliance.
+ 191          *
+ 192          * Parameters:
+ 193          *  prescaler:  prascaler value.
+ 194          *
+ 195          * Return:
+ 196          *  None
+ 197          *
+ 198          *******************************************************************************/
+ 199          void SMS_LIB_SetPrescaler(uint8 prescaler)
+ 200          {
+ 201   1          prescaler = prescaler;
+ 202   1      }
+ 203          
+ 204          void SMS_LIB_V3_SetAnalogSwitchesSrc_PRS(void)
+ 205          {
+ 206   1              CapSense_SetAnalogSwitchesSource(CapSense_ANALOG_SWITCHES_SRC_PRS);
+ 207   1      }
+ 208          
+ 209          void SMS_LIB_V3_SetAnalogSwitchesSrc_Prescaler(void)
+ 210          {
+ 211   1              CapSense_SetAnalogSwitchesSource(CapSense_ANALOG_SWITCHES_SRC_PRESCALER);
+ 212   1      }
+ 213          
+ 214          #endif  /* End (CapSense_TUNING_METHOD == CapSense_AUTO_TUNING) */
+ 215          
+ 216          
+ 217          /* [] END OF FILE */
+C51 COMPILER V9.03   CAPSENSE_SMS_WRAPPER                                                  08/27/2015 14:50:40 PAGE 5   
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION _SMS_LIB_ScanSensor (BEGIN)
+                                           ; SOURCE LINE # 113
+0000 900000      R     MOV     DPTR,#SensorNumber
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 114
+                                           ; SOURCE LINE # 115
+0005 900000      R     MOV     DPTR,#SensorNumber
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A 120000      E     LCALL   _CapSense_ScanSensor
+                                           ; SOURCE LINE # 116
+000D 22                RET     
+             ; FUNCTION _SMS_LIB_ScanSensor (END)
+
+             ; FUNCTION SMS_LIB_IsBusy (BEGIN)
+                                           ; SOURCE LINE # 132
+                                           ; SOURCE LINE # 133
+                                           ; SOURCE LINE # 134
+0000 120000      E     LCALL   CapSense_IsBusy
+                                           ; SOURCE LINE # 135
+0003         ?C0002:
+0003 22                RET     
+             ; FUNCTION SMS_LIB_IsBusy (END)
+
+             ; FUNCTION _CapSense_CalculateThresholds (BEGIN)
+                                           ; SOURCE LINE # 154
+0000 900000      R     MOV     DPTR,#SensorNumber
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 155
+                                           ; SOURCE LINE # 156
+0005 900000      R     MOV     DPTR,#SensorNumber
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A 120000      E     LCALL   _SMS_LIB_V3_CalculateThresholds
+                                           ; SOURCE LINE # 157
+000D 22                RET     
+             ; FUNCTION _CapSense_CalculateThresholds (END)
+
+             ; FUNCTION CapSense_AutoTune (BEGIN)
+                                           ; SOURCE LINE # 176
+                                           ; SOURCE LINE # 177
+                                           ; SOURCE LINE # 179
+0000 120000      E     LCALL   SMS_LIB_V3_AutoTune1Ch
+                                           ; SOURCE LINE # 183
+0003 22                RET     
+             ; FUNCTION CapSense_AutoTune (END)
+
+             ; FUNCTION _SMS_LIB_SetPrescaler (BEGIN)
+                                           ; SOURCE LINE # 199
+0000 900000      R     MOV     DPTR,#prescaler
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 200
+                                           ; SOURCE LINE # 201
+0005 900000      R     MOV     DPTR,#prescaler
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+C51 COMPILER V9.03   CAPSENSE_SMS_WRAPPER                                                  08/27/2015 14:50:40 PAGE 6   
+
+000A 900000      R     MOV     DPTR,#prescaler
+000D EF                MOV     A,R7
+000E F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 202
+000F 22                RET     
+             ; FUNCTION _SMS_LIB_SetPrescaler (END)
+
+             ; FUNCTION SMS_LIB_V3_SetAnalogSwitchesSrc_PRS (BEGIN)
+                                           ; SOURCE LINE # 204
+                                           ; SOURCE LINE # 205
+                                           ; SOURCE LINE # 206
+0000 7F02              MOV     R7,#02H
+0002 120000      E     LCALL   _CapSense_SetAnalogSwitchesSource
+                                           ; SOURCE LINE # 207
+0005 22                RET     
+             ; FUNCTION SMS_LIB_V3_SetAnalogSwitchesSrc_PRS (END)
+
+             ; FUNCTION SMS_LIB_V3_SetAnalogSwitchesSrc_Prescaler (BEGIN)
+                                           ; SOURCE LINE # 209
+                                           ; SOURCE LINE # 210
+                                           ; SOURCE LINE # 211
+0000 7F01              MOV     R7,#01H
+0002 120000      E     LCALL   _CapSense_SetAnalogSwitchesSource
+                                           ; SOURCE LINE # 212
+0005 22                RET     
+             ; FUNCTION SMS_LIB_V3_SetAnalogSwitchesSrc_Prescaler (END)
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     64    ----
+   CONSTANT SIZE    =     39    ----
+   XDATA SIZE       =    108       3
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

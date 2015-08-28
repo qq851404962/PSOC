@@ -1,0 +1,1226 @@
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 1   
+
+
+C51 COMPILER V9.03, COMPILATION OF MODULE CAPSENSE_COMPCH0
+OBJECT MODULE PLACED IN .\DP8051\DP8051_Keil_903\Debug\CapSense_CompCH0.obj
+COMPILER INVOKED BY: C:\Program Files (x86)\Cypress\PSoC Creator\2.0\PSoC Creator\import\keil\pk51\9.03\C51\BIN\c51.exe 
+                    -.\Generated_Source\PSoC3\CapSense_CompCH0.c NOIV LARGE MODDP2 OMF2 VB(1) PR(.\DP8051\DP8051_Keil_903\Debug\CapSense_Comp
+                    -CH0.lst) CD DB NOIP OT(2,SIZE) INCDIR(Generated_Source\PSoC3) OJ(.\DP8051\DP8051_Keil_903\Debug\CapSense_CompCH0.obj)
+
+line level    source
+
+   1          /*******************************************************************************
+   2          * File Name: CapSense_CompCH0.c  
+   3          * Version 1.70
+   4          *
+   5          *  Description:
+   6          *    This file provides the source code to the API for the Comparator component.
+   7          *
+   8          *  Note:
+   9          *     
+  10          *******************************************************************************
+  11          * Copyright 2008-2011, Cypress Semiconductor Corporation.  All rights reserved.
+  12          * You may use this file only in accordance with the license, terms, conditions, 
+  13          * disclaimers, and limitations in the end user license agreement accompanying 
+  14          * the software package with which this file was provided.
+  15          ********************************************************************************/
+  16          
+  17          #include "CapSense_CompCH0.h"
+  18          
+  19          uint8 CapSense_CompCH0_initVar = 0u;
+  20          static CapSense_CompCH0_backupStruct  CapSense_CompCH0_backup;
+  21          
+  22          /* variable to decide whether or not to restore the control register in 
+  23             Enable() API for PSoC5 ES1 only */
+  24          #if (CY_PSOC5_ES1)
+                  uint8 CapSense_CompCH0_restoreReg = 0u;
+              #endif /* CY_PSOC5_ES1 */
+  27          
+  28          
+  29          /*******************************************************************************
+  30          * Function Name: CapSense_CompCH0_Init
+  31          ********************************************************************************
+  32          *
+  33          * Summary:
+  34          *  Initialize to the schematic state
+  35          * 
+  36          * Parameters:  
+  37          *  void  
+  38          *
+  39          * Return: 
+  40          *  void
+  41          *
+  42          * Reentrant:
+  43          *  Yes
+  44          *
+  45          *******************************************************************************/
+  46          void CapSense_CompCH0_Init(void) 
+  47          {
+  48   1          /* Set default speed/power */
+  49   1          CapSense_CompCH0_SetSpeed(CapSense_CompCH0_DEFAULT_SPEED);
+  50   1      
+  51   1          /* Set default Hysteresis */
+  52   1          if ( CapSense_CompCH0_DEFAULT_HYSTERESIS == 0u )
+  53   1          {
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 2   
+
+  54   2              CapSense_CompCH0_CR |= CapSense_CompCH0_HYST_OFF;
+  55   2          }
+  56   1          else
+  57   1          {
+  58   2              CapSense_CompCH0_CR &= ~CapSense_CompCH0_HYST_OFF; 
+  59   2          }
+  60   1          
+  61   1          /* Power down override feature is not supported for PSoC5. */
+  62   1          #if (CY_PSOC3)
+  63   1              /* Set default Power Down Override */
+  64   1              if ( CapSense_CompCH0_DEFAULT_PWRDWN_OVRD == 0u )
+  65   1              {
+  66   2                  CapSense_CompCH0_CR &= ~CapSense_CompCH0_PWRDWN_OVRD;
+  67   2              }
+  68   1              else 
+  69   1              {
+  70   2                  CapSense_CompCH0_CR |= CapSense_CompCH0_PWRDWN_OVRD;
+  71   2              }
+  72   1          #endif /* CY_PSOC3 */
+  73   1          
+  74   1          /* Set mux always on logic */
+  75   1          CapSense_CompCH0_CR |= CapSense_CompCH0_MX_AO;
+  76   1      
+  77   1          /* Set default sync */
+  78   1          CapSense_CompCH0_CLK &= ~CapSense_CompCH0_SYNCCLK_MASK;
+  79   1          if ( CapSense_CompCH0_DEFAULT_BYPASS_SYNC == 0u )
+  80   1          {
+  81   2              CapSense_CompCH0_CLK |= CapSense_CompCH0_SYNC_CLK_EN;
+  82   2          }
+  83   1          else
+  84   1          {
+  85   2              CapSense_CompCH0_CLK |= CapSense_CompCH0_BYPASS_SYNC;
+  86   2          }
+  87   1      }
+  88          
+  89          
+  90          /*******************************************************************************
+  91          * Function Name: CapSense_CompCH0_Enable
+  92          ********************************************************************************
+  93          *
+  94          * Summary:
+  95          *  Enable the Comparator
+  96          * 
+  97          * Parameters:  
+  98          *  void  
+  99          *
+ 100          * Return: 
+ 101          *  void
+ 102          *
+ 103          * Reentrant:
+ 104          *  Yes
+ 105          *
+ 106          *******************************************************************************/
+ 107          void CapSense_CompCH0_Enable(void) 
+ 108          {
+ 109   1          CapSense_CompCH0_PWRMGR |= CapSense_CompCH0_ACT_PWR_EN;
+ 110   1          CapSense_CompCH0_STBY_PWRMGR |= CapSense_CompCH0_STBY_PWR_EN;
+ 111   1           
+ 112   1           /* This is to restore the value of register CR which is saved 
+ 113   1          in prior to the modification in stop() API */
+ 114   1          #if (CY_PSOC5_ES1)
+                  if(CapSense_CompCH0_restoreReg == 1u)
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 3   
+
+                  {
+                      CapSense_CompCH0_CR = CapSense_CompCH0_backup.compCRReg;
+              
+                      /* Clear the flag */
+                      CapSense_CompCH0_restoreReg = 0u;
+                  }
+                  #endif /* CY_PSOC5_ES1 */
+ 123   1      }
+ 124          
+ 125          
+ 126          /*******************************************************************************
+ 127          * Function Name: CapSense_CompCH0_Start
+ 128          ********************************************************************************
+ 129          *
+ 130          * Summary:
+ 131          *  The start function initializes the Analog Comparator with the default values.
+ 132          *
+ 133          * Parameters:
+ 134          *  void
+ 135          *
+ 136          * Return:  
+ 137          *  void 
+ 138          *
+ 139          * Global variables:
+ 140          *  CapSense_CompCH0_initVar: Is modified when this function is called for the 
+ 141          *    first time. Is used to ensure that initialization happens only once.
+ 142          *  
+ 143          * Reentrant:
+ 144          *  No
+ 145          *
+ 146          *******************************************************************************/
+ 147          void CapSense_CompCH0_Start(void) 
+ 148          {
+ 149   1      
+ 150   1          if ( CapSense_CompCH0_initVar == 0u )
+ 151   1          {
+ 152   2              CapSense_CompCH0_Init();
+ 153   2              
+ 154   2              CapSense_CompCH0_initVar = 1u;
+ 155   2          }    
+ 156   1      
+ 157   1          /* Enable power to comparator */
+ 158   1          CapSense_CompCH0_Enable();    
+ 159   1      }
+ 160          
+ 161          
+ 162          /*******************************************************************************
+ 163          * Function Name: CapSense_CompCH0_Stop
+ 164          ********************************************************************************
+ 165          *
+ 166          * Summary:
+ 167          *  Powers down amplifier to lowest power state.
+ 168          *
+ 169          * Parameters:  
+ 170          *  void
+ 171          *
+ 172          * Return: 
+ 173          *  void 
+ 174          *
+ 175          * Reentrant:
+ 176          *  Yes
+ 177          *
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 4   
+
+ 178          *******************************************************************************/
+ 179          void CapSense_CompCH0_Stop(void) 
+ 180          {
+ 181   1          /* Disable power to comparator */
+ 182   1          CapSense_CompCH0_PWRMGR &= ~CapSense_CompCH0_ACT_PWR_EN;
+ 183   1          CapSense_CompCH0_STBY_PWRMGR &= ~CapSense_CompCH0_STBY_PWR_EN;    
+ 184   1      
+ 185   1          #if (CY_PSOC5_ES1)
+                      /* Enable the variable */
+                      CapSense_CompCH0_restoreReg = 1u;
+              
+                      /* Save the control register before clearing it */
+                      CapSense_CompCH0_backup.compCRReg = CapSense_CompCH0_CR;
+                      CapSense_CompCH0_CR = CapSense_CompCH0_COMP_REG_CLR;
+                  #endif /* CY_PSOC5_ES1 */
+ 193   1      }
+ 194          
+ 195          
+ 196          /*******************************************************************************
+ 197          * Function Name: CapSense_CompCH0_SetSpeed
+ 198          ********************************************************************************
+ 199          *
+ 200          * Summary:
+ 201          *  This function sets the speed of the Analog Comparator.  The faster the speed
+ 202          *  the more power that is used.
+ 203          *
+ 204          * Parameters:  
+ 205          *  speed:   (uint8) Sets operation mode of Comparator
+ 206          *
+ 207          * Return:  
+ 208          *  void 
+ 209          *
+ 210          * Reentrant:
+ 211          *  Yes
+ 212          *
+ 213          *******************************************************************************/
+ 214          void CapSense_CompCH0_SetSpeed(uint8 speed) 
+ 215          {
+ 216   1          /* Clear and Set power level */    
+ 217   1          CapSense_CompCH0_CR = (CapSense_CompCH0_CR & ~CapSense_CompCH0_PWR_MODE_MASK) |
+ 218   1                                 (speed & CapSense_CompCH0_PWR_MODE_MASK);
+ 219   1      
+ 220   1          /* Set trim value for high speed comparator */
+ 221   1          if(speed == CapSense_CompCH0_HIGHSPEED)
+ 222   1          {
+ 223   2              /* PSoC3 ES2 or early, PSoC5 ES1 or early */
+ 224   2              #if (CY_PSOC3_ES2 || CY_PSOC5_ES1)
+ 225   2              CapSense_CompCH0_TR = CapSense_CompCH0_HS_TRIM_TR0;
+ 226   2              #endif /* CY_PSOC3_ES2 || CY_PSOC5_ES1 */
+ 227   2              
+ 228   2              /* PSoC3 ES3 or later, PSoC5 ES2 or later */
+ 229   2              #if (CY_PSOC3_ES3 || CY_PSOC5_ES2) 
+                      CapSense_CompCH0_TR0 = CapSense_CompCH0_HS_TRIM_TR0;
+                      CapSense_CompCH0_TR1 = CapSense_CompCH0_HS_TRIM_TR1;
+                      #endif /* CY_PSOC3_ES2 || CY_PSOC5_ES1 */
+ 233   2          }
+ 234   1          else
+ 235   1          {
+ 236   2          /* PSoC3 ES2 or early, PSoC5 ES1 or early */
+ 237   2              #if (CY_PSOC3_ES2 || CY_PSOC5_ES1)
+ 238   2              CapSense_CompCH0_TR = CapSense_CompCH0_LS_TRIM_TR0;
+ 239   2              #endif /* CY_PSOC3_ES2 || CY_PSOC5_ES1 */
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 5   
+
+ 240   2              
+ 241   2              /* PSoC3 ES3 or later, PSoC5 ES2 or later */
+ 242   2              #if (CY_PSOC3_ES3 || CY_PSOC5_ES2) 
+                      CapSense_CompCH0_TR0 = CapSense_CompCH0_LS_TRIM_TR0;
+                      CapSense_CompCH0_TR1 = CapSense_CompCH0_LS_TRIM_TR1;
+                      #endif /* CY_PSOC3_ES2 || CY_PSOC5_ES1 */
+ 246   2          }
+ 247   1      
+ 248   1      }
+ 249          
+ 250          
+ 251          /*******************************************************************************
+ 252          * Function Name: CapSense_CompCH0_GetCompare
+ 253          ********************************************************************************
+ 254          *
+ 255          * Summary:
+ 256          *  This function returns the comparator output value.
+ 257          *
+ 258          * Parameters:  
+ 259          *   None
+ 260          *
+ 261          * Return:  
+ 262          *  (uint8)  0  if Pos_Input less than Neg_input
+ 263          *           1  if Pos_Input greater than Neg_input. 
+ 264          *
+ 265          * Reentrant:
+ 266          *  Yes
+ 267          *
+ 268          *******************************************************************************/
+ 269          uint8 CapSense_CompCH0_GetCompare(void) 
+ 270          {
+ 271   1          return( CapSense_CompCH0_WRK & CapSense_CompCH0_CMP_OUT_MASK);
+ 272   1      }
+ 273          
+ 274          
+ 275          /*******************************************************************************
+ 276          * Function Name: CapSense_CompCH0_trimAdjust
+ 277          ********************************************************************************
+ 278          *
+ 279          * Summary:
+ 280          *  This function adjusts the value in the low nibble/high nibble of the Analog 
+ 281          *  Comparator trim register
+ 282          *
+ 283          * Parameters:  
+ 284          *  nibble:
+ 285          *      0 -- adjusts the value in the low nibble
+ 286          *      1 -- adjusts the value in the high nibble
+ 287          *
+ 288          * Return:
+ 289          *  None
+ 290          *
+ 291          * Theory: 
+ 292          *  Function assumes comparator block is setup for trim adjust.
+ 293          *  Intended to be called from Comp_ZeroCal()
+ 294          * 
+ 295          * Side Effects:
+ 296          *  Routine uses a course 1ms delay following each trim adjustment to allow 
+ 297          *  the comparator output to respond.
+ 298          *
+ 299          * Reentrant:
+ 300          *  No
+ 301          *
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 6   
+
+ 302          *******************************************************************************/
+ 303          void CapSense_CompCH0_trimAdjust(uint8 nibble)
+ 304          {
+ 305   1          uint8 trimCnt;
+ 306   1          uint8 cmpState;   
+ 307   1      
+ 308   1          /* get current state of comparator output */
+ 309   1          cmpState = CapSense_CompCH0_WRK & CapSense_CompCH0_CMP_OUT_MASK;
+ 310   1          
+ 311   1          if (nibble == 0u)
+ 312   1          {    
+ 313   2              /* if comparator output is high, negative offset adjust is required */
+ 314   2              if ( cmpState != 0u )
+ 315   2              {
+ 316   3                  /* PSoC3 ES2 or early, PSoC5 ES1 or early */
+ 317   3                  #if (CY_PSOC3_ES2 || CY_PSOC5_ES1)
+ 318   3                      CapSense_CompCH0_TR |= CapSense_CompCH0_CMP_TRIM1_DIR;
+ 319   3                  #endif /* CY_PSOC3_ES2 || CY_PSOC5_ES1 */
+ 320   3                  
+ 321   3                  /* PSoC3 ES3 or later, PSoC5 ES2 or later */
+ 322   3                  #if (CY_PSOC3_ES3 || CY_PSOC5_ES2)
+                              CapSense_CompCH0_TR0 |= CapSense_CompCH0_CMP_TR0_DIR;
+                          #endif /* CY_PSOC3_ES3 || CY_PSOC5_ES2 */
+ 325   3              }
+ 326   2          }
+ 327   1          else
+ 328   1          {
+ 329   2              /* if comparator output is low, positive offset adjust is required */
+ 330   2              if ( cmpState == 0u )
+ 331   2              {
+ 332   3                  /* PSoC3 ES2 or early, PSoC5 ES1 or early */
+ 333   3                  #if (CY_PSOC3_ES2 || CY_PSOC5_ES1)
+ 334   3                      CapSense_CompCH0_TR |= CapSense_CompCH0_CMP_TRIM2_DIR; 
+ 335   3                  #endif /* CY_PSOC3_ES2 || CY_PSOC5_ES1 */
+ 336   3                  
+ 337   3                  /* PSoC3 ES3 or later, PSoC5 ES2 or later */
+ 338   3                  #if (CY_PSOC3_ES3 || CY_PSOC5_ES2)
+                              CapSense_CompCH0_TR1 |= CapSense_CompCH0_CMP_TR1_DIR;
+                          #endif /* CY_PSOC3_ES3 || CY_PSOC5_ES2 */
+ 341   3              }
+ 342   2          }
+ 343   1      
+ 344   1          /* Increment trim value until compare output changes state */
+ 345   1          for ( trimCnt = 0; trimCnt < 7; trimCnt++ )
+ 346   1          {
+ 347   2              if (nibble == 0u)
+ 348   2              {
+ 349   3                  /* PSoC3 ES2 or early, PSoC5 ES1 or early */
+ 350   3                  #if (CY_PSOC3_ES2 || CY_PSOC5_ES1)
+ 351   3                      CapSense_CompCH0_TR += 1u;
+ 352   3                  #endif /* CY_PSOC3_ES2 || CY_PSOC5_ES1 */
+ 353   3                  
+ 354   3                  /* PSoC3 ES3 or later, PSoC5 ES2 or later */
+ 355   3                  #if (CY_PSOC3_ES3 || CY_PSOC5_ES2)
+                              CapSense_CompCH0_TR0 += 1u;
+                          #endif /* CY_PSOC3_ES3 || CY_PSOC5_ES2 */
+ 358   3              }
+ 359   2              else
+ 360   2              {
+ 361   3                  /* PSoC3 ES2 or early, PSoC5 ES1 or early */
+ 362   3                  #if (CY_PSOC3_ES2 || CY_PSOC5_ES1)
+ 363   3                      CapSense_CompCH0_TR += 0x10u;
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 7   
+
+ 364   3                  #endif /* CY_PSOC3_ES2 || CY_PSOC5_ES1 */
+ 365   3                  
+ 366   3                  /* PSoC3 ES3 or later, PSoC5 ES2 or later */
+ 367   3                  #if (CY_PSOC3_ES3 || CY_PSOC5_ES2)
+                              CapSense_CompCH0_TR1 += 0x10u;
+                          #endif /* CY_PSOC3_ES3 || CY_PSOC5_ES2 */
+ 370   3              }
+ 371   2              
+ 372   2              CyDelay(1);
+ 373   2              
+ 374   2              /* Check for change in comparator output */
+ 375   2              if ((CapSense_CompCH0_WRK & CapSense_CompCH0_CMP_OUT_MASK) != cmpState)
+ 376   2              {
+ 377   3                  break;      /* output changed state, trim phase is complete */
+ 378   3              }        
+ 379   2          }    
+ 380   1      }
+ 381          
+ 382          
+ 383          /*******************************************************************************
+ 384          * Function Name: CapSense_CompCH0_ZeroCal
+ 385          ********************************************************************************
+ 386          *
+ 387          * Summary:
+ 388          *  This function calibrates the offset of the Analog Comparator.
+ 389          *
+ 390          * Parameters:  
+ 391          *  None
+ 392          *
+ 393          * Return:  
+ 394          *  (uint16)  value written in trim register when calibration complete.
+ 395          *
+ 396          * Theory: 
+ 397          *  This function is used to optimize the calibration for user specific voltage
+ 398          *  range.  The comparator trim is adjusted to counter transistor offsets
+ 399          *   - offset is defined as positive if the output transitions to high before inP
+ 400          *     is greater than inN
+ 401          *   - offset is defined as negative if the output transitions to high after inP
+ 402          *     is greater than inP
+ 403          *
+ 404          *  The Analog Comparator provides 1 byte for offset trim.  The byte contains two
+ 405          *  4 bit trim fields - one is a course trim and the other allows smaller
+ 406          *  offset adjustments.
+ 407          *  - low nibble - fine trim for Fast mode, course trim for Slow mode
+ 408          *  - high nibble - fine trim for Slow mode, course trim
+ 409          *    for Fast mode
+ 410          *  - trim[3] selects positive or negative offset adjust
+ 411          *  - for low nibble: trim[3]is set high to add negative offset
+ 412          *  - for high nibble: trim[3]is set high to add positive offset  
+ 413          *
+ 414          *  Trim algorithm is a two phase process
+ 415          *  The first phase performs course offset adjustment
+ 416          *  The second phase serves one of two purposes depending on the outcome of the
+ 417          *  first phase
+ 418          *  - if the first trim value was maxed out without a comparator output 
+ 419          *    transition, more offset will be added by adjusting the second trim value.
+ 420          *  - if the first trim phase resulted in a comparator output transition, the
+ 421          *    second trim value will serve as fine trim (in the opposite direction)to
+ 422          *    ensure the offset is < 1 mV.
+ 423          *
+ 424          *  Trim Process:   
+ 425          *  1) User applies a voltage to the negative input.  Voltage should be in the
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 8   
+
+ 426          *     comparator operating range or an average of the operating voltage range.
+ 427          *  2) Clear registers associated with analog routing to the positive input.
+ 428          *  3) Disable Hysteresis
+ 429          *  4) Set the calibration bit to short the negative and positive inputs to
+ 430          *     the users calibration voltage.
+ 431          *  5) Clear the TR register  ( TR = 0x00 )
+ 432          *  ** SLOW MODE
+ 433          *  6) Check if compare output is high, if so, set trim[3] of lower 
+ 434          *     nibble to a 1.
+ 435          *  7) Increment trim[2:0] of lower nibble until the compare output changes
+ 436          *     (course trim).
+ 437          *  8) Check if compare output is low, if so, set trim[3] of higher 
+ 438          *     nibble to a 1.
+ 439          *  9) Increment trim[2:0] of higher nibble until the compare output changes 
+ 440          *     state (fine trim)
+ 441          *  ** FAST MODE - change order of steps 6,7 vs. steps 8,9
+ 442          *
+ 443          * Side Effects:
+ 444          *  Routine clears analog routing associated with the comparator positive input.  
+ 445          *  This may affect routing of signals from other components that are connected
+ 446          *  to the positive input of the comparator.
+ 447          *
+ 448          * Reentrant:
+ 449          *  Yes
+ 450          *
+ 451          *******************************************************************************/
+ 452          uint16 CapSense_CompCH0_ZeroCal(void) 
+ 453          {
+ 454   1          uint8 tmpSW0;
+ 455   1          uint8 tmpSW2;
+ 456   1          uint8 tmpSW3;
+ 457   1          uint8 tmpCR;
+ 458   1      
+ 459   1          /* Save a copy of routing registers associated with inP */
+ 460   1          tmpSW0 = CapSense_CompCH0_SW0;
+ 461   1          tmpSW2 = CapSense_CompCH0_SW2;
+ 462   1          tmpSW3 = CapSense_CompCH0_SW3;
+ 463   1      
+ 464   1           /* Clear routing for inP, retain routing for inN */
+ 465   1          CapSense_CompCH0_SW0 = 0x00u;
+ 466   1          CapSense_CompCH0_SW2 = 0x00u;
+ 467   1          CapSense_CompCH0_SW3 = tmpSW3 & ~CapSense_CompCH0_CMP_SW3_INPCTL_MASK;
+ 468   1      
+ 469   1          /* Preserve original configuration
+ 470   1           * - turn off Hysteresis
+ 471   1           * - set calibration bit - shorts inN to inP
+ 472   1          */
+ 473   1          tmpCR = CapSense_CompCH0_CR;
+ 474   1          CapSense_CompCH0_CR |= (CapSense_CompCH0_CAL_ON | CapSense_CompCH0_HYST_OFF);
+ 475   1          
+ 476   1          /* Write default low values to trim register - no offset adjust */
+ 477   1          /* PSoC3 ES2 or early, PSoC5 ES1 or early */
+ 478   1          #if (CY_PSOC3_ES2 || CY_PSOC5_ES1)
+ 479   1              CapSense_CompCH0_TR = CapSense_CompCH0_DEFAULT_CMP_TRIM;
+ 480   1          #endif /* CY_PSOC3_ES2 || CY_PSOC5_ES1 */
+ 481   1          
+ 482   1          /* PSoC3 ES3 or later, PSoC5 ES2 or later */
+ 483   1          #if (CY_PSOC3_ES3 || CY_PSOC5_ES2)
+                      CapSense_CompCH0_TR0 = CapSense_CompCH0_DEFAULT_CMP_TRIM;
+                      CapSense_CompCH0_TR1 = CapSense_CompCH0_DEFAULT_CMP_TRIM;
+                  #endif /* CY_PSOC3_ES3 || CY_PSOC5_ES2 */
+ 487   1      
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 9   
+
+ 488   1          /* Two phase trim - mode determines which value is trimmed first */   
+ 489   1          if ( (CapSense_CompCH0_CR & CapSense_CompCH0_PWR_MODE_MASK) == CapSense_CompCH0_PWR_MODE_FAST)
+ 490   1          {
+ 491   2              CapSense_CompCH0_trimAdjust(1);          /* course trim */
+ 492   2              CapSense_CompCH0_trimAdjust(0);          /* fine trim */
+ 493   2          }
+ 494   1          else /* default to trim for slow mode */
+ 495   1          {
+ 496   2              CapSense_CompCH0_trimAdjust(0);          /* course trim */
+ 497   2              CapSense_CompCH0_trimAdjust(1);          /* fine trim */
+ 498   2          }
+ 499   1         
+ 500   1          /* Restore Config Register */
+ 501   1          CapSense_CompCH0_CR = tmpCR;
+ 502   1          
+ 503   1          /* Restore routing registers for inP */
+ 504   1          CapSense_CompCH0_SW0 = tmpSW0;
+ 505   1          CapSense_CompCH0_SW2 = tmpSW2;
+ 506   1          CapSense_CompCH0_SW3 = tmpSW3;
+ 507   1          
+ 508   1          /* PSoC3 ES2 or early, PSoC5 ES1 or early */
+ 509   1          #if (CY_PSOC3_ES2 || CY_PSOC5_ES1)
+ 510   1              return (uint16) CapSense_CompCH0_TR;
+ 511   1          #endif /* CY_PSOC3_ES2 || CY_PSOC5_ES1 */
+ 512   1          
+ 513   1          /* PSoC3 ES3 or later, PSoC5 ES2 or later */
+ 514   1          #if (CY_PSOC3_ES3 || CY_PSOC5_ES2)
+                      return ((CapSense_CompCH0_TR0)|(CapSense_CompCH0_TR1));        
+                  #endif /* CY_PSOC3_ES3 || CY_PSOC5_ES2 */
+ 517   1      }
+ 518          
+ 519          
+ 520          /*******************************************************************************
+ 521          * Function Name: CapSense_CompCH0_LoadTrim
+ 522          ********************************************************************************
+ 523          *
+ 524          * Summary:
+ 525          *  This function stores a value in the Analog Comparator trim register.
+ 526          *
+ 527          * Parameters:  
+ 528          *  uint8    trimVal - trim value.  This value is the same format as the value 
+ 529          *           returned by the _ZeroCal routine.
+ 530          *
+ 531          * Return:  
+ 532          *  None
+ 533          *
+ 534          * Reentrant:
+ 535          *  Yes
+ 536          *
+ 537          *******************************************************************************/
+ 538          void CapSense_CompCH0_LoadTrim(uint16 trimVal) 
+ 539          {
+ 540   1          /* Stores value in the Analog Comparator trim register */
+ 541   1          /* PSoC3 ES2 or early, PSoC5 ES1 or early */
+ 542   1          #if (CY_PSOC3_ES2 || CY_PSOC5_ES1)
+ 543   1              CapSense_CompCH0_TR = (uint8) trimVal;
+ 544   1          #endif /* CY_PSOC3_ES2 || CY_PSOC5_ES1 */
+ 545   1          
+ 546   1          /* PSoC3 ES3 or later, PSoC5 ES2 or later */
+ 547   1          #if (CY_PSOC3_ES3 || CY_PSOC5_ES2)
+                      /* Stores value in the Analog Comparator trim register for P-type load */
+                      CapSense_CompCH0_TR0 = (uint8) trimVal;
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 10  
+
+                      
+                      /* Stores value in the Analog Comparator trim register for N-type load */
+                      CapSense_CompCH0_TR1 = (uint8) (trimVal >> 8); 
+                  #endif /* CY_PSOC3_ES3 || CY_PSOC5_ES2 */
+ 554   1      }
+ 555          
+ 556          
+ 557          #if (CY_PSOC3)
+ 558          /*******************************************************************************
+ 559          * Function Name: CapSense_CompCH0_PwrDwnOverrideEnable
+ 560          ********************************************************************************
+ 561          *
+ 562          * Summary:
+ 563          *  This is the power down over-ride feature. This function ignores sleep 
+ 564          *  parameter and allows the component to stay active during sleep mode.
+ 565          *
+ 566          * Parameters:  
+ 567          *  None
+ 568          *
+ 569          * Return:  
+ 570          *  None
+ 571          *
+ 572          * Reentrant:
+ 573          *  Yes
+ 574          *
+ 575          *******************************************************************************/
+ 576          void CapSense_CompCH0_PwrDwnOverrideEnable(void) 
+ 577          {
+ 578   1          /* Set the pd_override bit in CMP_CR register */
+ 579   1          CapSense_CompCH0_CR |= CapSense_CompCH0_PWRDWN_OVRD;
+ 580   1      }
+ 581          
+ 582          
+ 583          /*******************************************************************************
+ 584          * Function Name: CapSense_CompCH0_PwrDwnOverrideDisable
+ 585          ********************************************************************************
+ 586          *
+ 587          * Summary:
+ 588          *  This is the power down over-ride feature. This allows the component to stay
+ 589          *  inactive during sleep.
+ 590          *
+ 591          * Parameters:  
+ 592          *  None
+ 593          *
+ 594          * Return:  
+ 595          *  None
+ 596          *
+ 597          * Reentrant:
+ 598          *  Yes
+ 599          *
+ 600          *******************************************************************************/
+ 601          void CapSense_CompCH0_PwrDwnOverrideDisable(void) 
+ 602          {
+ 603   1          /* Reset the pd_override bit in CMP_CR register */
+ 604   1          CapSense_CompCH0_CR &= ~CapSense_CompCH0_PWRDWN_OVRD;
+ 605   1      }
+ 606          #endif /* (CY_PSOC3) */
+ 607          
+ 608          
+ 609          /* [] END OF FILE */
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 11  
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION CapSense_CompCH0_Init (BEGIN)
+                                           ; SOURCE LINE # 46
+                                           ; SOURCE LINE # 47
+                                           ; SOURCE LINE # 49
+0000 7F00              MOV     R7,#00H
+0002 120000      R     LCALL   _CapSense_CompCH0_SetSpeed
+                                           ; SOURCE LINE # 52
+                                           ; SOURCE LINE # 53
+                                           ; SOURCE LINE # 54
+0005 905840            MOV     DPTR,#05840H
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A EF                MOV     A,R7
+000B 4420              ORL     A,#020H
+000D FF                MOV     R7,A
+000E EF                MOV     A,R7
+000F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 55
+                                           ; SOURCE LINE # 57
+                                           ; SOURCE LINE # 58
+                                           ; SOURCE LINE # 59
+0010         ?C0002:
+                                           ; SOURCE LINE # 64
+                                           ; SOURCE LINE # 65
+                                           ; SOURCE LINE # 66
+0010 905840            MOV     DPTR,#05840H
+0013 E0                MOVX    A,@DPTR
+0014 FF                MOV     R7,A
+0015 EF                MOV     A,R7
+0016 54FB              ANL     A,#0FBH
+0018 FF                MOV     R7,A
+0019 EF                MOV     A,R7
+001A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 67
+                                           ; SOURCE LINE # 69
+                                           ; SOURCE LINE # 70
+                                           ; SOURCE LINE # 71
+001B         ?C0004:
+                                           ; SOURCE LINE # 75
+001B 905840            MOV     DPTR,#05840H
+001E E0                MOVX    A,@DPTR
+001F FF                MOV     R7,A
+0020 EF                MOV     A,R7
+0021 4408              ORL     A,#08H
+0023 FF                MOV     R7,A
+0024 EF                MOV     A,R7
+0025 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 78
+0026 905AC7            MOV     DPTR,#05AC7H
+0029 E0                MOVX    A,@DPTR
+002A FF                MOV     R7,A
+002B EF                MOV     A,R7
+002C 54E7              ANL     A,#0E7H
+002E FF                MOV     R7,A
+002F EF                MOV     A,R7
+0030 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 79
+                                           ; SOURCE LINE # 80
+                                           ; SOURCE LINE # 81
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 12  
+
+                                           ; SOURCE LINE # 82
+0031         ?C0005:
+                                           ; SOURCE LINE # 84
+                                           ; SOURCE LINE # 85
+0031 905AC7            MOV     DPTR,#05AC7H
+0034 E0                MOVX    A,@DPTR
+0035 FF                MOV     R7,A
+0036 EF                MOV     A,R7
+0037 4410              ORL     A,#010H
+0039 FF                MOV     R7,A
+003A EF                MOV     A,R7
+003B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 86
+                                           ; SOURCE LINE # 87
+003C         ?C0007:
+003C 22                RET     
+             ; FUNCTION CapSense_CompCH0_Init (END)
+
+             ; FUNCTION CapSense_CompCH0_Enable (BEGIN)
+                                           ; SOURCE LINE # 107
+                                           ; SOURCE LINE # 108
+                                           ; SOURCE LINE # 109
+0000 9043A7            MOV     DPTR,#043A7H
+0003 E0                MOVX    A,@DPTR
+0004 FF                MOV     R7,A
+0005 EF                MOV     A,R7
+0006 4401              ORL     A,#01H
+0008 FF                MOV     R7,A
+0009 EF                MOV     A,R7
+000A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 110
+000B 9043B7            MOV     DPTR,#043B7H
+000E E0                MOVX    A,@DPTR
+000F FF                MOV     R7,A
+0010 EF                MOV     A,R7
+0011 4401              ORL     A,#01H
+0013 FF                MOV     R7,A
+0014 EF                MOV     A,R7
+0015 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 123
+0016 22                RET     
+             ; FUNCTION CapSense_CompCH0_Enable (END)
+
+             ; FUNCTION CapSense_CompCH0_Start (BEGIN)
+                                           ; SOURCE LINE # 147
+                                           ; SOURCE LINE # 148
+                                           ; SOURCE LINE # 150
+0000 900000      R     MOV     DPTR,#CapSense_CompCH0_initVar
+0003 E0                MOVX    A,@DPTR
+0004 FF                MOV     R7,A
+0005 EF                MOV     A,R7
+0006 7009              JNZ     ?C0009
+                                           ; SOURCE LINE # 151
+                                           ; SOURCE LINE # 152
+0008 120000      R     LCALL   CapSense_CompCH0_Init
+                                           ; SOURCE LINE # 154
+000B 900000      R     MOV     DPTR,#CapSense_CompCH0_initVar
+000E 7401              MOV     A,#01H
+0010 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 155
+0011         ?C0009:
+                                           ; SOURCE LINE # 158
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 13  
+
+0011 120000      R     LCALL   CapSense_CompCH0_Enable
+                                           ; SOURCE LINE # 159
+0014 22                RET     
+             ; FUNCTION CapSense_CompCH0_Start (END)
+
+             ; FUNCTION CapSense_CompCH0_Stop (BEGIN)
+                                           ; SOURCE LINE # 179
+                                           ; SOURCE LINE # 180
+                                           ; SOURCE LINE # 182
+0000 9043A7            MOV     DPTR,#043A7H
+0003 E0                MOVX    A,@DPTR
+0004 FF                MOV     R7,A
+0005 EF                MOV     A,R7
+0006 54FE              ANL     A,#0FEH
+0008 FF                MOV     R7,A
+0009 EF                MOV     A,R7
+000A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 183
+000B 9043B7            MOV     DPTR,#043B7H
+000E E0                MOVX    A,@DPTR
+000F FF                MOV     R7,A
+0010 EF                MOV     A,R7
+0011 54FE              ANL     A,#0FEH
+0013 FF                MOV     R7,A
+0014 EF                MOV     A,R7
+0015 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 193
+0016 22                RET     
+             ; FUNCTION CapSense_CompCH0_Stop (END)
+
+             ; FUNCTION _CapSense_CompCH0_SetSpeed (BEGIN)
+                                           ; SOURCE LINE # 214
+0000 900000      R     MOV     DPTR,#speed
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 215
+                                           ; SOURCE LINE # 217
+0005 900000      R     MOV     DPTR,#speed
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A EF                MOV     A,R7
+000B 5403              ANL     A,#03H
+000D FF                MOV     R7,A
+000E 905840            MOV     DPTR,#05840H
+0011 E0                MOVX    A,@DPTR
+0012 FE                MOV     R6,A
+0013 EE                MOV     A,R6
+0014 54FC              ANL     A,#0FCH
+0016 FE                MOV     R6,A
+0017 EE                MOV     A,R6
+0018 4F                ORL     A,R7
+0019 FF                MOV     R7,A
+001A 905840            MOV     DPTR,#05840H
+001D EF                MOV     A,R7
+001E F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 221
+001F 900000      R     MOV     DPTR,#speed
+0022 E0                MOVX    A,@DPTR
+0023 FF                MOV     R7,A
+0024 EF                MOV     A,R7
+0025 B4010F            CJNE    A,#01H,?C0012
+                                           ; SOURCE LINE # 222
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 14  
+
+                                           ; SOURCE LINE # 225
+0028 7B0C              MOV     R3,#0CH
+002A 7A01              MOV     R2,#01H
+002C 7910              MOV     R1,#010H
+002E 120000      E     LCALL   _cyread8
+0031 904600            MOV     DPTR,#04600H
+0034 EF                MOV     A,R7
+0035 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 233
+0036 22                RET     
+0037         ?C0012:
+                                           ; SOURCE LINE # 235
+                                           ; SOURCE LINE # 238
+0037 7B0C              MOV     R3,#0CH
+0039 7A01              MOV     R2,#01H
+003B 79A9              MOV     R1,#0A9H
+003D 120000      E     LCALL   _cyread8
+0040 904600            MOV     DPTR,#04600H
+0043 EF                MOV     A,R7
+0044 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 246
+                                           ; SOURCE LINE # 248
+0045         ?C0014:
+0045 22                RET     
+             ; FUNCTION _CapSense_CompCH0_SetSpeed (END)
+
+             ; FUNCTION CapSense_CompCH0_GetCompare (BEGIN)
+                                           ; SOURCE LINE # 269
+                                           ; SOURCE LINE # 270
+                                           ; SOURCE LINE # 271
+0000 905B90            MOV     DPTR,#05B90H
+0003 E0                MOVX    A,@DPTR
+0004 FF                MOV     R7,A
+0005 EF                MOV     A,R7
+0006 5401              ANL     A,#01H
+0008 FF                MOV     R7,A
+                                           ; SOURCE LINE # 272
+0009         ?C0015:
+0009 22                RET     
+             ; FUNCTION CapSense_CompCH0_GetCompare (END)
+
+             ; FUNCTION _CapSense_CompCH0_trimAdjust (BEGIN)
+                                           ; SOURCE LINE # 303
+0000 900000      R     MOV     DPTR,#nibble
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 304
+                                           ; SOURCE LINE # 309
+0005 905B90            MOV     DPTR,#05B90H
+0008 E0                MOVX    A,@DPTR
+0009 FF                MOV     R7,A
+000A EF                MOV     A,R7
+000B 5401              ANL     A,#01H
+000D FF                MOV     R7,A
+000E 900000      R     MOV     DPTR,#cmpState
+0011 EF                MOV     A,R7
+0012 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 311
+0013 900000      R     MOV     DPTR,#nibble
+0016 E0                MOVX    A,@DPTR
+0017 FF                MOV     R7,A
+0018 EF                MOV     A,R7
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 15  
+
+0019 7015              JNZ     ?C0016
+                                           ; SOURCE LINE # 312
+                                           ; SOURCE LINE # 314
+001B 900000      R     MOV     DPTR,#cmpState
+001E E0                MOVX    A,@DPTR
+001F FF                MOV     R7,A
+0020 EF                MOV     A,R7
+0021 6020              JZ      ?C0018
+                                           ; SOURCE LINE # 315
+                                           ; SOURCE LINE # 318
+0023 904600            MOV     DPTR,#04600H
+0026 E0                MOVX    A,@DPTR
+0027 FF                MOV     R7,A
+0028 EF                MOV     A,R7
+0029 4408              ORL     A,#08H
+002B FF                MOV     R7,A
+002C EF                MOV     A,R7
+002D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 325
+                                           ; SOURCE LINE # 326
+002E 8013              SJMP    ?C0018
+0030         ?C0016:
+                                           ; SOURCE LINE # 328
+                                           ; SOURCE LINE # 330
+0030 900000      R     MOV     DPTR,#cmpState
+0033 E0                MOVX    A,@DPTR
+0034 FF                MOV     R7,A
+0035 EF                MOV     A,R7
+0036 700B              JNZ     ?C0018
+                                           ; SOURCE LINE # 331
+                                           ; SOURCE LINE # 334
+0038 904600            MOV     DPTR,#04600H
+003B E0                MOVX    A,@DPTR
+003C FF                MOV     R7,A
+003D EF                MOV     A,R7
+003E 4480              ORL     A,#080H
+0040 FF                MOV     R7,A
+0041 EF                MOV     A,R7
+0042 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 341
+                                           ; SOURCE LINE # 342
+0043         ?C0018:
+                                           ; SOURCE LINE # 345
+0043 900000      R     MOV     DPTR,#trimCnt
+0046 E4                CLR     A
+0047 F0                MOVX    @DPTR,A
+0048         ?C0020:
+0048 900000      R     MOV     DPTR,#trimCnt
+004B E0                MOVX    A,@DPTR
+004C FF                MOV     R7,A
+004D EF                MOV     A,R7
+004E C3                CLR     C
+004F 9407              SUBB    A,#07H
+0051 5044              JNC     ?C0026
+                                           ; SOURCE LINE # 346
+                                           ; SOURCE LINE # 347
+0053 900000      R     MOV     DPTR,#nibble
+0056 E0                MOVX    A,@DPTR
+0057 FF                MOV     R7,A
+0058 EF                MOV     A,R7
+0059 7008              JNZ     ?C0023
+                                           ; SOURCE LINE # 348
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 16  
+
+                                           ; SOURCE LINE # 351
+005B 904600            MOV     DPTR,#04600H
+005E E0                MOVX    A,@DPTR
+005F 04                INC     A
+0060 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 358
+0061 8007              SJMP    ?C0024
+0063         ?C0023:
+                                           ; SOURCE LINE # 360
+                                           ; SOURCE LINE # 363
+0063 904600            MOV     DPTR,#04600H
+0066 E0                MOVX    A,@DPTR
+0067 2410              ADD     A,#010H
+0069 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 370
+006A         ?C0024:
+                                           ; SOURCE LINE # 372
+006A 7F01              MOV     R7,#01H
+006C 7E00              MOV     R6,#00H
+006E 7D00              MOV     R5,#00H
+0070 7C00              MOV     R4,#00H
+0072 120000      E     LCALL   _?CyDelay
+                                           ; SOURCE LINE # 375
+0075 905B90            MOV     DPTR,#05B90H
+0078 E0                MOVX    A,@DPTR
+0079 FF                MOV     R7,A
+007A EF                MOV     A,R7
+007B 5401              ANL     A,#01H
+007D FF                MOV     R7,A
+007E 7E00              MOV     R6,#00H
+0080 900000      R     MOV     DPTR,#cmpState
+0083 E0                MOVX    A,@DPTR
+0084 FD                MOV     R5,A
+0085 7C00              MOV     R4,#00H
+0087 EF                MOV     A,R7
+0088 B5050C            CJNE    A,AR5,?C0026
+008B EE                MOV     A,R6
+008C B50408            CJNE    A,AR4,?C0026
+                                           ; SOURCE LINE # 376
+                                           ; SOURCE LINE # 377
+                                           ; SOURCE LINE # 378
+008F         ?C0025:
+                                           ; SOURCE LINE # 379
+008F         ?C0022:
+008F 900000      R     MOV     DPTR,#trimCnt
+0092 E0                MOVX    A,@DPTR
+0093 04                INC     A
+0094 F0                MOVX    @DPTR,A
+0095 80B1              SJMP    ?C0020
+                                           ; SOURCE LINE # 380
+0097         ?C0026:
+0097 22                RET     
+             ; FUNCTION _CapSense_CompCH0_trimAdjust (END)
+
+             ; FUNCTION CapSense_CompCH0_ZeroCal (BEGIN)
+                                           ; SOURCE LINE # 452
+                                           ; SOURCE LINE # 453
+                                           ; SOURCE LINE # 460
+0000 905AC0            MOV     DPTR,#05AC0H
+0003 E0                MOVX    A,@DPTR
+0004 FF                MOV     R7,A
+0005 900000      R     MOV     DPTR,#tmpSW0
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 17  
+
+0008 EF                MOV     A,R7
+0009 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 461
+000A 905AC2            MOV     DPTR,#05AC2H
+000D E0                MOVX    A,@DPTR
+000E FF                MOV     R7,A
+000F 900000      R     MOV     DPTR,#tmpSW2
+0012 EF                MOV     A,R7
+0013 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 462
+0014 905AC3            MOV     DPTR,#05AC3H
+0017 E0                MOVX    A,@DPTR
+0018 FF                MOV     R7,A
+0019 900000      R     MOV     DPTR,#tmpSW3
+001C EF                MOV     A,R7
+001D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 465
+001E 905AC0            MOV     DPTR,#05AC0H
+0021 E4                CLR     A
+0022 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 466
+0023 905AC2            MOV     DPTR,#05AC2H
+0026 E4                CLR     A
+0027 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 467
+0028 900000      R     MOV     DPTR,#tmpSW3
+002B E0                MOVX    A,@DPTR
+002C FF                MOV     R7,A
+002D EF                MOV     A,R7
+002E 54F6              ANL     A,#0F6H
+0030 FF                MOV     R7,A
+0031 905AC3            MOV     DPTR,#05AC3H
+0034 EF                MOV     A,R7
+0035 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 473
+0036 905840            MOV     DPTR,#05840H
+0039 E0                MOVX    A,@DPTR
+003A FF                MOV     R7,A
+003B 900000      R     MOV     DPTR,#tmpCR
+003E EF                MOV     A,R7
+003F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 474
+0040 905840            MOV     DPTR,#05840H
+0043 E0                MOVX    A,@DPTR
+0044 FF                MOV     R7,A
+0045 EF                MOV     A,R7
+0046 4430              ORL     A,#030H
+0048 FF                MOV     R7,A
+0049 EF                MOV     A,R7
+004A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 479
+004B 904600            MOV     DPTR,#04600H
+004E E4                CLR     A
+004F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 489
+0050 905840            MOV     DPTR,#05840H
+0053 E0                MOVX    A,@DPTR
+0054 FF                MOV     R7,A
+0055 EF                MOV     A,R7
+0056 5403              ANL     A,#03H
+0058 FF                MOV     R7,A
+0059 7E00              MOV     R6,#00H
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 18  
+
+005B EF                MOV     A,R7
+005C 6401              XRL     A,#01H
+005E 4E                ORL     A,R6
+005F 700C              JNZ     ?C0027
+                                           ; SOURCE LINE # 490
+                                           ; SOURCE LINE # 491
+0061 7F01              MOV     R7,#01H
+0063 120000      R     LCALL   _CapSense_CompCH0_trimAdjust
+                                           ; SOURCE LINE # 492
+0066 7F00              MOV     R7,#00H
+0068 120000      R     LCALL   _CapSense_CompCH0_trimAdjust
+                                           ; SOURCE LINE # 493
+006B 800A              SJMP    ?C0028
+006D         ?C0027:
+                                           ; SOURCE LINE # 495
+                                           ; SOURCE LINE # 496
+006D 7F00              MOV     R7,#00H
+006F 120000      R     LCALL   _CapSense_CompCH0_trimAdjust
+                                           ; SOURCE LINE # 497
+0072 7F01              MOV     R7,#01H
+0074 120000      R     LCALL   _CapSense_CompCH0_trimAdjust
+                                           ; SOURCE LINE # 498
+0077         ?C0028:
+                                           ; SOURCE LINE # 501
+0077 900000      R     MOV     DPTR,#tmpCR
+007A E0                MOVX    A,@DPTR
+007B FF                MOV     R7,A
+007C 905840            MOV     DPTR,#05840H
+007F EF                MOV     A,R7
+0080 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 504
+0081 900000      R     MOV     DPTR,#tmpSW0
+0084 E0                MOVX    A,@DPTR
+0085 FF                MOV     R7,A
+0086 905AC0            MOV     DPTR,#05AC0H
+0089 EF                MOV     A,R7
+008A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 505
+008B 900000      R     MOV     DPTR,#tmpSW2
+008E E0                MOVX    A,@DPTR
+008F FF                MOV     R7,A
+0090 905AC2            MOV     DPTR,#05AC2H
+0093 EF                MOV     A,R7
+0094 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 506
+0095 900000      R     MOV     DPTR,#tmpSW3
+0098 E0                MOVX    A,@DPTR
+0099 FF                MOV     R7,A
+009A 905AC3            MOV     DPTR,#05AC3H
+009D EF                MOV     A,R7
+009E F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 510
+009F 904600            MOV     DPTR,#04600H
+00A2 E0                MOVX    A,@DPTR
+00A3 FF                MOV     R7,A
+00A4 7E00              MOV     R6,#00H
+                                           ; SOURCE LINE # 517
+00A6         ?C0029:
+00A6 22                RET     
+             ; FUNCTION CapSense_CompCH0_ZeroCal (END)
+
+             ; FUNCTION _CapSense_CompCH0_LoadTrim (BEGIN)
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 19  
+
+                                           ; SOURCE LINE # 538
+0000 900000      R     MOV     DPTR,#trimVal
+0003 EE                MOV     A,R6
+0004 F0                MOVX    @DPTR,A
+0005 A3                INC     DPTR
+0006 EF                MOV     A,R7
+0007 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 539
+                                           ; SOURCE LINE # 543
+0008 900000      R     MOV     DPTR,#trimVal
+000B E0                MOVX    A,@DPTR
+000C FE                MOV     R6,A
+000D A3                INC     DPTR
+000E E0                MOVX    A,@DPTR
+000F FF                MOV     R7,A
+0010 904600            MOV     DPTR,#04600H
+0013 EF                MOV     A,R7
+0014 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 554
+0015 22                RET     
+             ; FUNCTION _CapSense_CompCH0_LoadTrim (END)
+
+             ; FUNCTION CapSense_CompCH0_PwrDwnOverrideEnable (BEGIN)
+                                           ; SOURCE LINE # 576
+                                           ; SOURCE LINE # 577
+                                           ; SOURCE LINE # 579
+0000 905840            MOV     DPTR,#05840H
+0003 E0                MOVX    A,@DPTR
+0004 FF                MOV     R7,A
+0005 EF                MOV     A,R7
+0006 4404              ORL     A,#04H
+0008 FF                MOV     R7,A
+0009 EF                MOV     A,R7
+000A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 580
+000B 22                RET     
+             ; FUNCTION CapSense_CompCH0_PwrDwnOverrideEnable (END)
+
+             ; FUNCTION CapSense_CompCH0_PwrDwnOverrideDisable (BEGIN)
+                                           ; SOURCE LINE # 601
+                                           ; SOURCE LINE # 602
+                                           ; SOURCE LINE # 604
+0000 905840            MOV     DPTR,#05840H
+0003 E0                MOVX    A,@DPTR
+0004 FF                MOV     R7,A
+0005 EF                MOV     A,R7
+0006 54FB              ANL     A,#0FBH
+0008 FF                MOV     R7,A
+0009 EF                MOV     A,R7
+000A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 605
+000B 22                RET     
+             ; FUNCTION CapSense_CompCH0_PwrDwnOverrideDisable (END)
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    573    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      3      10
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+C51 COMPILER V9.03   CAPSENSE_COMPCH0                                                      08/27/2015 14:50:41 PAGE 20  
+
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
